@@ -924,6 +924,7 @@ function App() {
 
   // Compute Button Disabled State
   const isButtonDisabled = useMemo(() => {
+    if (fsrBusy) return true;
     // Context mismatch check
     if (
       activeGameStatus.gameId !== config.activeGame ||
@@ -954,7 +955,7 @@ function App() {
 
     // Idle / Error -> Enabled
     return false;
-  }, [activeGameStatus, config.activeGame, config.serviceChannel]);
+  }, [activeGameStatus, config.activeGame, config.serviceChannel, fsrBusy]);
 
   // Whether the install needs patching: local last-seen version differs from remote latest.
   // Only meaningful when game is installed and we have both versions.
@@ -1686,6 +1687,7 @@ function App() {
   }, [config.activeGame, config.serviceChannel, openGamePathModal]);
 
   const handleGameStart = () => {
+    if (fsrPending.current) return;
     if (!window.electronAPI) {
       logger.warn("Electron API not available");
       return;
@@ -2327,7 +2329,7 @@ function App() {
 
                 <GameStartButton
                   onClick={handleGameStart}
-                  label={gameStartButtonLabel}
+                  label={fsrBusy ? "FSR 설치·제거 중…" : gameStartButtonLabel}
                   disabled={isButtonDisabled}
                   className={isButtonDisabled ? "disabled" : ""}
                   style={

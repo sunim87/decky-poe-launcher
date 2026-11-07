@@ -10,6 +10,8 @@ import {
   applyFsrLite,
   fsrLiteOverrides,
   fsrLiteSettings,
+  isFsrLiteChangePending,
+  withFsrLiteSettingChange,
 } from "../game/fsr-lite";
 
 import type * as FileSystem from "node:fs/promises";
@@ -88,6 +90,33 @@ afterEach(async () => {
 });
 
 describe("FSR Lite installation ownership", () => {
+  it("locks game launch before async path lookup through setting commit", async () => {
+    let finish!: () => void;
+    const wait = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const operation = withFsrLiteSettingChange(async () => {
+      await wait;
+      expect(isFsrLiteChangePending()).toBe(true);
+      await applyFsrLite(game, true);
+      expect(isFsrLiteChangePending()).toBe(true);
+    });
+    expect(isFsrLiteChangePending()).toBe(true);
+    await expect(withFsrLiteSettingChange(async () => {})).rejects.toThrow(
+      "진행 중",
+    );
+    finish();
+    await operation;
+    expect(isFsrLiteChangePending()).toBe(false);
+  });
+  it("releases the setting lock after preparation failure", async () => {
+    await expect(
+      withFsrLiteSettingChange(async () => {
+        throw Error("lookup failed");
+      }),
+    ).rejects.toThrow("lookup failed");
+    expect(isFsrLiteChangePending()).toBe(false);
+  });
   it("resumes OFF after a process interruption has already removed the proxy", async () => {
     await applyFsrLite(game, true);
     const manifest = path.join(game, ".poe-fsr-lite.json");

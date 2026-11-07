@@ -12,6 +12,22 @@ import type { AppConfig } from "../../shared/types";
 
 const PROFILE_NAME = "POE Launcher Frame Generation";
 
+export function makoTargetFps(vendor: string, product: string): number {
+  return vendor.trim().toLowerCase() === "valve" &&
+    /^(jupiter|galileo|steam deck)$/i.test(product.trim())
+    ? 90
+    : 144;
+}
+
+async function deviceMakoTargetFps(): Promise<number> {
+  const [vendor, product] = await Promise.all(
+    ["sys_vendor", "product_name"].map((name) =>
+      fs.readFile(`Z:\\sys\\class\\dmi\\id\\${name}`, "utf8").catch(() => ""),
+    ),
+  );
+  return makoTargetFps(vendor, product);
+}
+
 export function createFrameGenerationEnvironment(
   inherited: NodeJS.ProcessEnv,
   config: AppConfig,
@@ -69,6 +85,7 @@ export async function prepareFrameGeneration(
     throw new Error(`${sourceDirectory}의 version = 2 설정이 필요합니다.`);
   }
   const multiplier = Number(config.lsfgMultiplier) || 2;
+  const targetFps = mode === "mako" ? await deviceMakoTargetFps() : 0;
   const profile = [
     "[[profile]]",
     `name = "${PROFILE_NAME}"`,
@@ -82,6 +99,14 @@ export async function prepareFrameGeneration(
           "frame_generation_provisioned = true",
           "frame_generation_enabled = true",
           "adaptive = false",
+          `target_fps = ${targetFps}`,
+          // Fixed mode ignores target_fps; cap native frames to leave room for FG.
+          ...(targetFps === 144
+            ? [`base_fps_cap = ${Math.floor(targetFps / multiplier)}`]
+            : []),
+          ...(targetFps === 144 && !config.fsrLiteEnabled
+            ? ["swapchain_image_count_compatibility = true"]
+            : []),
           'pacing = "none"',
         ]),
   ].join("\n");

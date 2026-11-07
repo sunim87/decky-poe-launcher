@@ -10,6 +10,20 @@ const DIRECTORY = "POE-FSR-Lite";
 const MANIFEST = ".poe-fsr-lite.json";
 const ROOT_FILES = ["dxgi.dll", "OptiScaler.ini"] as const;
 let busy = false;
+let settingChangePending = false;
+
+export const isFsrLiteChangePending = () => settingChangePending || busy;
+
+export async function withFsrLiteSettingChange(operation: () => Promise<void>) {
+  if (isFsrLiteChangePending())
+    throw new Error("FSR 설정 변경이 진행 중입니다.");
+  settingChangePending = true;
+  try {
+    await operation();
+  } finally {
+    settingChangePending = false;
+  }
+}
 
 export function updateIni(
   text: string,

@@ -5,7 +5,7 @@ import * as path from "node:path";
 import { dialog } from "electron";
 
 import { prepareFrameGeneration } from "./frame-generation";
-import { applyFsrLite } from "./fsr-lite";
+import { applyFsrLite, isFsrLiteChangePending } from "./fsr-lite";
 import { runGameSetupInstaller } from "./GameSetupInstaller";
 import { AppConfig } from "../../shared/types";
 import { AppContext } from "../events/types";
@@ -56,6 +56,10 @@ export const launchKakaoGameDirect = async (
   url: string,
 ): Promise<boolean> => {
   if (launchPending) return true;
+  if (isFsrLiteChangePending()) {
+    logger.warn("[KakaoDirectLaunch] Blocked while FSR files are changing.");
+    return false;
+  }
   launchPending = true;
   try {
     return await launchKakaoGameDirectImpl(context, url);
@@ -151,6 +155,10 @@ const launchKakaoGameDirectImpl = async (
   }
 
   let frameGeneration: Awaited<ReturnType<typeof prepareFrameGeneration>>;
+  // The website has handed off a valid token. FSR hashing/copying and local
+  // launch preparation are not web automation and may exceed its 10s timer.
+  // Preparation errors already have an explicit error dialog below.
+  context.disableValidationMode();
   try {
     if (gameId === "POE2") {
       await applyFsrLite(installPath, config.fsrLiteEnabled === true);

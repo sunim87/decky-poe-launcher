@@ -1,13 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_CONFIG } from "../../shared/config";
-import { prepareFrameGeneration } from "../game/frame-generation";
+import {
+  makoTargetFps,
+  prepareFrameGeneration,
+} from "../game/frame-generation";
 
 const mocks = vi.hoisted(() => ({
   mkdir: vi.fn(),
   writeFile: vi.fn(),
   rename: vi.fn(),
-  readFile: vi.fn(async () => "version = 2\n[global]\nallow_fp16 = true\n"),
+  readFile: vi.fn(async (file: unknown): Promise<string> => {
+    if (String(file).endsWith("sys_vendor")) return "Valve\n";
+    if (String(file).endsWith("product_name")) return "Galileo\n";
+    return "version = 2\n[global]\nallow_fp16 = true\n";
+  }),
 }));
 vi.mock("node:fs/promises", () => ({ ...mocks, default: mocks }));
 vi.mock("electron", () => ({
@@ -32,6 +39,94 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("game launch working directory", () => {
+  it.each([true, false])(
+    "isolates native Vulkan MAKO swapchain compatibility when FSR is %s",
+    async (fsrLiteEnabled) => {
+      mocks.readFile.mockImplementation(async (file: unknown) => {
+        if (String(file).endsWith("sys_vendor")) return "LENOVO";
+        if (String(file).endsWith("product_name")) return "83N0";
+        return "version = 2\n[global]\nallow_fp16 = true\n";
+      });
+      await prepareFrameGeneration(
+        { ...DEFAULT_CONFIG, frameGenerationMode: "mako", fsrLiteEnabled },
+        "C:\\Game\\PathOfExile_KG.exe",
+      );
+      const call = mocks.writeFile.mock.calls.find(([target]) =>
+        String(target).endsWith("mako.toml.tmp"),
+      );
+      expect(
+        String(call?.[1]).includes(
+          "swapchain_image_count_compatibility = true",
+        ),
+      ).toBe(!fsrLiteEnabled);
+    },
+  );
+  it.each([
+    ["Valve", "Jupiter", 90],
+    ["Valve\n", "Galileo\n", 90],
+    ["LENOVO", "83N0", 144],
+    ["ASUSTeK COMPUTER INC.", "ROG Ally", 144],
+    ["", "", 144],
+  ])("selects MAKO target for %s/%s", (vendor, product, fps) => {
+    expect(makoTargetFps(vendor, product)).toBe(fps);
+  });
+
+  it.each([90, 144])(
+    "writes the device's %i FPS into the isolated MAKO profile",
+    async (fps) => {
+      mocks.readFile.mockImplementation(async (file: unknown) => {
+        if (String(file).endsWith("sys_vendor"))
+          return fps === 90 ? "Valve" : "LENOVO";
+        if (String(file).endsWith("product_name"))
+          return fps === 90 ? "Galileo" : "83N0";
+        return 'version = 2\n[global]\nallow_fp16 = true\n[[profile]]\nname = "mako"\ntarget_fps = 90\n';
+      });
+      await prepareFrameGeneration(
+        { ...DEFAULT_CONFIG, frameGenerationMode: "mako" },
+        "C:\\Kakaogames\\Path of Exile2\\PathOfExile_KG.exe",
+      );
+      const call = mocks.writeFile.mock.calls.find(([target]) =>
+        String(target).endsWith("mako.toml.tmp"),
+      );
+      expect(call?.[1]).toContain(
+        `name = "POE Launcher Frame Generation"\nmultiplier = 2`,
+      );
+      expect(
+        String(call?.[1]).split('name = "POE Launcher Frame Generation"')[1],
+      ).toContain(`target_fps = ${fps}`);
+      const managed = String(call?.[1]).split(
+        'name = "POE Launcher Frame Generation"',
+      )[1];
+      if (fps === 144) expect(managed).toContain("base_fps_cap = 72");
+      else expect(managed).not.toContain("base_fps_cap");
+    },
+  );
+  it.each([
+    ["2", 72],
+    ["3", 48],
+    ["4", 36],
+  ] as const)(
+    "caps non-Deck native FPS for %sx generation",
+    async (multiplier, cap) => {
+      mocks.readFile.mockImplementation(async (file: unknown) => {
+        if (String(file).endsWith("sys_vendor")) return "LENOVO";
+        if (String(file).endsWith("product_name")) return "83N0";
+        return "version = 2\n[global]\nallow_fp16 = true\n";
+      });
+      await prepareFrameGeneration(
+        {
+          ...DEFAULT_CONFIG,
+          frameGenerationMode: "mako",
+          lsfgMultiplier: multiplier,
+        },
+        "C:\\Game\\PathOfExile_KG.exe",
+      );
+      const call = mocks.writeFile.mock.calls.find(([target]) =>
+        String(target).endsWith("mako.toml.tmp"),
+      );
+      expect(call?.[1]).toContain(`base_fps_cap = ${cap}`);
+    },
+  );
   it.each([
     [
       "C:\\Kakaogames\\Path of Exile2\\PathOfExile_KG.exe",

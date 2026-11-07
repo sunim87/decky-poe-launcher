@@ -21,7 +21,11 @@ import JSZip from "jszip";
 import { ContextProvider } from "./context-provider";
 import { eventBus } from "./events/EventBus";
 import { registerCoreEventHandlers } from "./events/register-handlers";
-import { applyFsrLite } from "./game/fsr-lite";
+import {
+  applyFsrLite,
+  isFsrLiteChangePending,
+  withFsrLiteSettingChange,
+} from "./game/fsr-lite";
 import {
   isKakaoStarterUrl,
   isKakaoGameLaunchPending,
@@ -747,9 +751,13 @@ ipcMain.handle("config:set", async (_event, key: string, value: unknown) => {
     if (isKakaoGameLaunchPending())
       throw new Error("게임 실행 준비가 끝난 뒤 변경해 주세요.");
     if (typeof value !== "boolean") throw new Error("잘못된 FSR 설정값입니다.");
-    const gamePath = await getGameInstallPath("Kakao Games", "POE2");
-    if (!gamePath) throw new Error("POE2 설치 폴더를 먼저 지정해 주세요.");
-    await applyFsrLite(gamePath, value);
+    await withFsrLiteSettingChange(async () => {
+      const gamePath = await getGameInstallPath("Kakao Games", "POE2");
+      if (!gamePath) throw new Error("POE2 설치 폴더를 먼저 지정해 주세요.");
+      await applyFsrLite(gamePath, value);
+      setConfigWithEvent(key, value);
+    });
+    return;
   }
   // It handles context checking internally
   setConfigWithEvent(key, value);
@@ -1561,6 +1569,13 @@ ipcMain.on("kakao:login-required", (event, data?: { url?: string }) => {
 });
 
 ipcMain.on("automation:update-timeout", (event, timeoutMs: number) => {
+  if (isKakaoGameLaunchPending()) {
+    clearAutomationTimeout();
+    logger.log(
+      "[Automation] Ignoring web timer during direct game launch preparation.",
+    );
+    return;
+  }
   lastActiveAutomationWebContentsId = event.sender.id; // Correctly track the caller
   startAutomationTimeout(timeoutMs);
   logger.log(
@@ -2737,6 +2752,12 @@ function initDebugWindow(triggerSource: string = "Dynamic") {
 ipcMain.on(
   "trigger-game-start",
   (_event, launchContext?: GameLaunchContext) => {
+    if (isFsrLiteChangePending()) {
+      logger.warn(
+        "[Main] Game start blocked until FSR installation/removal completes.",
+      );
+      return;
+    }
     logger.log('[Main] IPC "trigger-game-start" Received from Renderer');
     if (appContext) {
       const config = getConfig() as AppConfig;

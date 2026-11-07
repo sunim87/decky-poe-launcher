@@ -23,6 +23,26 @@
 
 LSFG-VK·MAKO는 해당 Vulkan 레이어와 원래 설정이 설치되어 있어야 합니다. 이 플러그인은 두 레이어 자체를 설치하지 않습니다. FSR Lite는 실기기에서 검증했던 시험 DLL을 포함합니다.
 
+### LSFG-VK·MAKO 버전과 적용 설정
+
+2026-11-07 스팀덱에서 확인한 구성입니다. 아래 Decky 플러그인은 별도 설치 항목이며, 런처 설치 ZIP에 포함된 버전을 뜻하지 않습니다.
+
+| 항목 | LSFG-VK | MAKO |
+|---|---|---|
+| 검증한 Decky 플러그인 버전 | Decky LSFG-VK **0.14.4** | MAKO **4.6.0** |
+| 런타임/설정 형식 | LSFG-VK 레이어 **2.0.0**, TOML `version = 2` | MAKO Renderer, TOML `version = 2` |
+| 프레임 생성 배율 | 기본 **2배**, 런처 설정에서 2/3/4배 선택 | 같은 배율 설정 사용 |
+| 성능 모드 | `performance_mode = true` | `performance_mode = true` |
+| 흐름 해상도 비율 | `flow_scale = 0.65` | `flow_scale = 0.65` |
+| FP16 | 기존 전역 설정 유지, 검증 기기는 `allow_fp16 = true` | 기존 전역 설정 유지, 검증 기기는 `allow_fp16 = true` |
+| 추가 설정 | `preserve_swapchain_image_count = true` | `scaling_enabled = false`, `adaptive = false`, `pacing = "none"` |
+
+- 두 버튼은 상호 배타적으로 동작합니다. 하나를 ON으로 선택하면 다른 엔진은 OFF가 되며, 둘 다 OFF도 가능합니다. 변경 사항은 다음 게임 실행에 적용됩니다.
+- 게임 실행 때 기존 `~/.config/lsfg-vk/conf.toml` 또는 `~/.config/mako-render/conf.toml`을 복사해 **POE Launcher Frame Generation** 전용 프로필을 추가합니다. 기존 전역 설정 파일은 덮어쓰지 않습니다.
+- FP16은 복사한 전역 설정을 따릅니다. 다른 기기에서 자동으로 FP16을 켜는 설정은 아닙니다.
+- MAKO 선택 시 `frame_generation_provisioned = true`, `frame_generation_enabled = true`를 적용하고 공간 업스케일링은 끕니다. 실행 환경의 HDR 노출 보정과 Steam Vulkan 오버레이도 비활성화합니다.
+- 각 엔진이 참조하는 Lossless Scaling DLL은 기존 설치 설정을 그대로 사용합니다. 두 엔진의 DLL 파일을 서로 교체하지 않습니다.
+
 ## 파일과 제거 범위
 
 런처: `~/Applications/POE2-Launcher/launcher/`.

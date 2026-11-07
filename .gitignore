@@ -3,3 +3,6 @@ __pycache__/
 dist/
 bin/launcher.zip
 .verification/
+launcher-source/src/main/assets/fsr-lite/**/*.dll
+launcher-source/src/main/assets/fsr-lite/*.dll
+launcher-source/dist-electron/

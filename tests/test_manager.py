@@ -40,6 +40,7 @@ class Tests(unittest.TestCase):
         (self.root / 'bin/release.json').write_text(json.dumps({'version': 'test', 'sha256': hashlib.sha256(archive.read_bytes()).hexdigest()}))
         for name in ['capsule','hero','logo','wide','icon']:
             (self.root / 'assets' / (name+'.png')).write_bytes(b'fixture')
+        (self.root / 'launcher_updater.py').write_text('fixture')
         self.patcher = patch.object(Manager, 'ensure_stopped')
         self.patcher.start(); self.addCleanup(self.patcher.stop)
 
@@ -96,6 +97,16 @@ class Tests(unittest.TestCase):
         prefix.mkdir(parents=True)
         with self.assertRaisesRegex(ValueError, '경로'): self.manager._remove_directory(prefix)
         self.assertTrue(prefix.exists())
+
+    def test_old_plugin_cannot_downgrade_new_launcher(self):
+        self.manager.prepare_install('123')
+        marker = self.manager.app / '.launcher-build.json'
+        marker.write_text(json.dumps({'build':99,'version':'newer-launcher'}))
+        exe = self.manager.app / 'POE2 Unofficial Launcher.exe'
+        exe.write_text('newer-binary')
+        self.manager.prepare_install('123')
+        self.assertEqual(exe.read_text(), 'newer-binary')
+        self.assertEqual(self.manager.status('123')['version'], 'newer-launcher')
 
     def test_refuses_archive_escape(self):
         archive = self.root / 'bin/launcher.zip'

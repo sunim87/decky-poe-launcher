@@ -98,9 +98,11 @@ class Manager:
         record = self.record(user)
         found = [entry for entry in self.entries(user) if self.matches(entry)]
         if len(found) > 1: raise ValueError('같은 런처 바로가기가 여러 개 있습니다. 중복을 먼저 정리하세요.')
+        marker = self.app / '.launcher-build.json'
+        version = json.loads(marker.read_text()).get('version') if marker.exists() else record.get('version')
         return {'ok': True, 'installed': (self.app / 'POE2 Unofficial Launcher.exe').is_file(),
                 'registered': bool(found), 'appid': found[0]['appid'] if found else record.get('appid'),
-                'managed': bool(record), 'version': record.get('version')}
+                'managed': bool(record), 'version': version}
 
     def _wrapper(self, proton, runtime):
         q = shlex.quote
@@ -109,11 +111,19 @@ class Manager:
             'export STEAM_COMPAT_CLIENT_INSTALL_PATH=' + q(str(self.steam)),
             'export STEAM_COMPAT_DATA_PATH="$base/compatdata"',
             'export POE_PROTON_PATH=' + q(str(proton)),
+            'export POE_LAUNCHER_BASE="$base"',
             'export ENABLE_GAMESCOPE_WSI=0', 'export DISABLE_LSFGVK=1',
             'export DISABLE_LSFGVK_EXPERIMENTAL=1', 'export DISABLE_MAKO=1',
             'unset ENABLE_MAKO LSFGVK_PROFILE MAKO_PROFILE',
-            'exec ' + q(str(runtime)) + ' --verb=run -- "$POE_PROTON_PATH" run ' +
-            q(str(self.app / 'POE2 Unofficial Launcher.exe')) + ' "$@" >> "$base/launcher.log" 2>&1', '',
+            'python3 "$base/launcher_updater.py" --base "$base" --check-and-apply >> "$base/launcher-update.log" 2>&1 || true',
+            'while true; do',
+            '  launcher_status=0',
+            '  ' + q(str(runtime)) + ' --verb=run -- "$POE_PROTON_PATH" run ' +
+            q(str(self.app / 'POE2 Unofficial Launcher.exe')) + ' "$@" >> "$base/launcher.log" 2>&1 || launcher_status=$?',
+            '  if [ ! -f "$base/launcher-update-restart.flag" ]; then exit "$launcher_status"; fi',
+            '  rm -- "$base/launcher-update-restart.flag"',
+            '  python3 "$base/launcher_updater.py" --base "$base" --apply-only >> "$base/launcher-update.log" 2>&1 || true',
+            'done', '',
         ])
 
     def prepare_install(self, user):
@@ -146,6 +156,16 @@ class Manager:
         elif existing:
             record['appid'] = existing[0]['appid']
             atomic_json(self.manifest(user), record)
+        marker = self.app / '.launcher-build.json'
+        current = json.loads(marker.read_text()) if marker.exists() else {}
+        if current.get('build', 0) > release.get('build', 0):
+            # An older Decky plugin must never downgrade an automatically updated launcher.
+            record.update(version=current['version'], phase='registering')
+            atomic_json(self.manifest(user), record)
+            (self.base / 'artwork').mkdir(exist_ok=True)
+            for name in [*ASSETS, 'icon']:
+                shutil.copy2(self.root / 'assets' / (name + '.png'), self.base / 'artwork' / (name + '.png'))
+            return self.install_reply(record)
         staging = Path(tempfile.mkdtemp(prefix='.launcher-stage-', dir=self.base))
         previous = self.base / '.launcher-previous'
         try:
@@ -160,6 +180,8 @@ class Manager:
                 if previous.exists(): self._remove_directory(previous)
                 self.app.replace(previous)
             staging.replace(self.app)
+            atomic_json(self.app / '.launcher-build.json', {'version':release['version'], 'build':release.get('build', 0)})
+            shutil.copy2(self.root / 'launcher_updater.py', self.base / 'launcher_updater.py')
             (self.base / 'artwork').mkdir(exist_ok=True)
             for name in [*ASSETS, 'icon']:
                 shutil.copy2(self.root / 'assets' / (name + '.png'), self.base / 'artwork' / (name + '.png'))
@@ -174,6 +196,9 @@ class Manager:
             raise
         finally:
             if staging.exists(): self._remove_directory(staging)
+        return self.install_reply(record)
+
+    def install_reply(self, record):
         return {'ok': True, 'name': NAME, 'existing': record.get('appid'),
                 'exe': '/bin/bash', 'options': shlex.quote(str(self.wrapper)),
                 'home': '"' + str(self.base) + '"', 'icon': str(self.base / 'artwork/icon.png')}
@@ -210,6 +235,10 @@ class Manager:
                 legacy = self.base / 'compatdata/pfx/drive_c/users/steamuser/AppData/Local/Programs/poe2-unofficial-launcher'
                 if legacy.exists(): self._remove_directory(legacy)
             self.wrapper.unlink(missing_ok=True)
+            for name in ['launcher_updater.py', 'launcher-update-restart.flag', 'launcher-update-pending.json', 'launcher-update-status.json', '.launcher-update.zip', '.launcher-update.download', '.launcher-update.lock']:
+                (self.base / name).unlink(missing_ok=True)
+            old = self.base / '.launcher-update-backup'
+            if old.exists(): self._remove_directory(old)
             artwork = self.base / 'artwork'
             if artwork.exists(): self._remove_directory(artwork)
         grid = self.account(user) / 'grid'
@@ -220,7 +249,7 @@ class Manager:
 
     def _remove_directory(self, directory):
         # Never accept a frontend-supplied deletion path or the shared prefix root.
-        allowed = [self.app, self.base / '.launcher-previous', self.base / 'artwork',
+        allowed = [self.app, self.base / '.launcher-previous', self.base / '.launcher-update-backup', self.base / 'artwork',
                    self.base / 'compatdata/pfx/drive_c/users/steamuser/AppData/Local/Programs/poe2-unofficial-launcher']
         resolved = directory.resolve()
         safe = any(resolved == p.absolute() for p in allowed) or (directory.name.startswith('.launcher-stage-') and directory.parent == self.base)

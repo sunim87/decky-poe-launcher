@@ -27,6 +27,7 @@
     ]
   },
   extraResources: [
+    { from: "../launcher_updater.py", to: "launcher_updater.py" },
     {
       from: "src/main/assets",
       to: "assets",
@@ -35,8 +36,8 @@
   ],
   publish: {
     provider: "github",
-    owner: "psp3322",
-    repo: "POE2-unofficial-launcher-for-steamdeck",
+    owner: "sunim87",
+    repo: "decky-poe-launcher",
     releaseType: "prerelease",
   },
 }

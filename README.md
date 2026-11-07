@@ -1,4 +1,4 @@
-# Decky POE Launcher 0.1.0
+# Decky POE Launcher 0.1.1
 
 [설치 ZIP 다운로드](https://github.com/sunim87/decky-poe-launcher/releases/latest) · [버그 제보](https://github.com/sunim87/decky-poe-launcher/issues)
 
@@ -11,10 +11,11 @@
 3. 플러그인의 **런처 설치**를 누릅니다. 라이브러리의 **POE2 Launcher**에서 실행합니다.
 4. 제거할 때 게임과 런처를 모두 종료하고 **런처 및 라이브러리 제거**를 누릅니다.
 
-설치에는 현재 수정본 런처가 포함되어 있습니다. 원본 GitHub 자동 업데이트를 사용하면 로컬 수정본이 바뀔 수 있으므로 배포 저장소 분리는 별도 작업입니다. 이 플러그인은 릴리스를 자동 게시하지 않습니다.
+설치에는 현재 수정본 런처와 런처 전용 자동 업데이트 지원이 포함됩니다. 업데이트 대상은 이 저장소의 런처 파일이며, Decky 플러그인 자체를 자동 교체하지 않습니다.
 
 ## 포함 내용
 
+- 런처 자체 자동 업데이트: 새 버전 확인·다운로드·안전한 적용
 - 홈페이지 변경 및 설치 감지 수정, 카카오 직접 실행
 - 홈페이지/거래소 모양의 LSFG-VK·MAKO 상호 배타 토글
 - OptiScaler 0.9.4 + FSR 4.1.2 INT8 Lite 설치/해제
@@ -43,6 +44,16 @@ LSFG-VK·MAKO는 해당 Vulkan 레이어와 원래 설정이 설치되어 있어
 - MAKO 선택 시 `frame_generation_provisioned = true`, `frame_generation_enabled = true`를 적용하고 공간 업스케일링은 끕니다. 실행 환경의 HDR 노출 보정과 Steam Vulkan 오버레이도 비활성화합니다.
 - 각 엔진이 참조하는 Lossless Scaling DLL은 기존 설치 설정을 그대로 사용합니다. 두 엔진의 DLL 파일을 서로 교체하지 않습니다.
 
+## 런처 자동 업데이트
+
+런처 시작 시 이 저장소의 최신 릴리스에서 런처 전용 정보를 확인합니다. 새 버전이면 자동 다운로드하고 SHA-256을 검증한 뒤 런처 프로그램 폴더만 교체합니다. 실행 중 새 버전을 발견하면 다운로드를 준비하고, 업데이트 후 재시작 또는 다음 런처 실행 때 적용합니다. 게임이 켜져 있을 때는 적용을 차단합니다.
+
+네트워크/검증 실패 시 기존 런처를 실행하며, 교체 중단 시 이전 런처를 복구합니다. 게임 파일·설정·라이브러리·이미지와 Decky 플러그인은 업데이트 대상으로 삼지 않습니다. 구버전 플러그인의 설치/복구로 최신 런처를 덮어쓰지 않도록 보호합니다.
+
+처음 자동 업데이트 지원을 설치할 때는 이번 ZIP으로 한 번 설치/복구해야 합니다. 이후에는 매번 Decky 플러그인을 재설치할 필요가 없습니다.
+
+배포자는 빌드 번호를 올리고 `scripts/package.py`와 `scripts/publish.py release`로 릴리스를 만들면 런처 ZIP과 `launcher-update.json`이 함께 올라갑니다. 플러그인 ZIP만 수동 업로드하면 런처 업데이트 정보가 생성되지 않습니다.
+
 ## 파일과 제거 범위
 
 런처: `~/Applications/POE2-Launcher/launcher/`.
@@ -63,6 +74,6 @@ LSFG-VK·MAKO는 해당 Vulkan 레이어와 원래 설정이 설치되어 있어
 
 `launcher-source/`는 수정 런처의 소스입니다. 런처의 원 라이선스는 해당 폴더의 `LICENSE`에 있습니다. 플러그인 자체는 MIT 라이선스입니다.
 
-런처 빌드용 외부 DLL을 복구하려면 릴리스 설치 ZIP을 받은 뒤 `python scripts/restore_assets.py Decky-POE-Launcher-v0.1.0.zip`을 실행합니다. 이어 `launcher-source/`에서 `npm ci`, `npm run build:check` 후 electron-builder로 Windows 폴더 패키지를 만듭니다. 배포 폴더를 `python scripts/package.py <win-unpacked 경로>`로 전달합니다.
+런처 빌드용 외부 DLL을 복구하려면 릴리스 설치 ZIP을 받은 뒤 `python scripts/restore_assets.py Decky-POE-Launcher-v0.1.1.zip`을 실행합니다. 이어 `launcher-source/`에서 `npm ci`, `npm run build:check` 후 electron-builder로 Windows 폴더 패키지를 만듭니다. 배포 폴더를 `python scripts/package.py <win-unpacked 경로>`로 전달합니다.
 
 버그 제보: https://github.com/sunim87/decky-poe-launcher/issues

@@ -11,6 +11,8 @@ import urllib.request
 
 REPO = 'sunim87/decky-poe-launcher'
 root = Path(__file__).resolve().parents[1]
+version = json.loads((root / 'package.json').read_text(encoding='utf8'))['version']
+tag = 'v' + version
 credential = subprocess.run(['git', 'credential', 'fill'], input='protocol=https\nhost=github.com\n\n', text=True, capture_output=True,
                             env={**os.environ, 'GCM_INTERACTIVE':'never'}, check=True)
 fields = dict(line.split('=',1) for line in credential.stdout.splitlines() if '=' in line)
@@ -36,20 +38,29 @@ if sys.argv[1] == 'create':
 elif sys.argv[1] == 'release':
     sha = subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()
     body = (root / 'RELEASE_NOTES.md').read_text(encoding='utf8')
-    try: release = request('/repos/' + REPO + '/releases/tags/v0.1.0')
+    try: release = request('/repos/' + REPO + '/releases/tags/' + tag)
     except urllib.error.HTTPError as error:
         if error.code != 404: raise
-        release = request('/repos/' + REPO + '/releases',{'tag_name':'v0.1.0','target_commitish':sha,'name':'Decky POE Launcher v0.1.0','body':body,'draft':False,'prerelease':False})
-    asset = root.parent / 'Decky-POE-Launcher-v0.1.0.zip'
-    if any(a['name'] == asset.name for a in release['assets']): raise RuntimeError('Asset already exists; inspect before replacement')
-    url = release['upload_url'].split('{')[0] + '?name=' + urllib.parse.quote(asset.name)
-    result = request(url, asset.read_bytes(), method='POST', binary=True)
-    assert result['size'] == asset.stat().st_size
-    print(json.dumps({'release':release['html_url'],'download':result['browser_download_url'],'bytes':result['size']}))
+        release = request('/repos/' + REPO + '/releases',{'tag_name':tag,'target_commitish':sha,'name':'Decky POE Launcher '+tag,'body':body,'draft':True,'prerelease':False})
+    import hashlib
+    for asset, name in [(root.parent / f'Decky-POE-Launcher-{tag}.zip', f'Decky-POE-Launcher-{tag}.zip'),
+                        (root / 'bin/launcher.zip', f'POE-Launcher-runtime-{tag}.zip'),
+                        (root / 'bin/launcher-update.json', 'launcher-update.json')]:
+        content = asset.read_bytes()
+        existing = next((a for a in release['assets'] if a['name'] == name), None)
+        if existing:
+            if existing.get('digest') != 'sha256:' + hashlib.sha256(content).hexdigest(): raise RuntimeError('Different release asset already exists: '+name)
+            continue
+        url = release['upload_url'].split('{')[0] + '?name=' + urllib.parse.quote(name)
+        result = request(url, content, method='POST', binary=True)
+        assert result['size'] == asset.stat().st_size
+        print('Uploaded',name,result['size'],flush=True)
+    if release['draft']: release = request('/repos/'+REPO+'/releases/'+str(release['id']),{'draft':False},method='PATCH')
+    print(release['html_url'])
 elif sys.argv[1] == 'verify':
-    release = request('/repos/' + REPO + '/releases/tags/v0.1.0')
+    release = request('/repos/' + REPO + '/releases/tags/' + tag)
     print(json.dumps({'release':release['html_url'],'assets':[{'name':a['name'],'bytes':a['size'],'state':a['state'],'digest':a.get('digest')} for a in release['assets']]}))
 elif sys.argv[1] == 'notes':
-    release = request('/repos/' + REPO + '/releases/tags/v0.1.0')
+    release = request('/repos/' + REPO + '/releases/tags/' + tag)
     result = request('/repos/' + REPO + '/releases/' + str(release['id']), {'body':(root / 'RELEASE_NOTES.md').read_text(encoding='utf8')}, method='PATCH')
     print(result['html_url'])

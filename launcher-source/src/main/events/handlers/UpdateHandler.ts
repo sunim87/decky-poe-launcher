@@ -4,6 +4,11 @@ import { autoUpdater } from "electron-updater";
 
 import { UpdateStatus } from "../../../shared/types";
 import { changelogService } from "../../services/ChangelogService";
+import {
+  checkPortableLauncherUpdate,
+  downloadPortableLauncherUpdate,
+  restartForPortableLauncherUpdate,
+} from "../../services/PortableLauncherUpdater";
 import { logger } from "../../utils/logger";
 import { PowerShellManager } from "../../utils/powershell";
 import { isWineEnvironment } from "../../utils/wine";
@@ -210,7 +215,7 @@ const checkForUpdatesSmart = async () => {
   try {
     // [SteamDeck] 업데이트는 이 포크의 릴리즈에서 받는다 (app-update.yml의
     // publish 설정과 일치시켜, 사전 태그 확인도 같은 저장소를 보게 한다).
-    const repo = "psp3322/POE2-unofficial-launcher-for-steamdeck";
+    const repo = "sunim87/decky-poe-launcher";
     const url = `https://api.github.com/repos/${repo}/releases/latest`;
 
     logger.log(
@@ -295,6 +300,20 @@ export const triggerUpdateCheck = async (
     `[UpdateHandler] Manual/Triggered update check (isSilent: ${isSilent})`,
   );
   currentCheckIsSilent = isSilent;
+  if (isWineEnvironment()) {
+    try {
+      await checkPortableLauncherUpdate((status) =>
+        sendStatus(context, status),
+      );
+    } catch (error) {
+      logger.warn("[UpdateHandler] Launcher-only update check failed:", error);
+      sendStatus(context, {
+        state: isSilent ? "idle" : "error",
+        ...(!isSilent ? { message: String(error) } : {}),
+      });
+    }
+    return;
+  }
   attachUpdateListeners(context);
 
   try {
@@ -337,6 +356,16 @@ export const UpdateDownloadHandler: EventHandler<UIUpdateDownloadEvent> = {
   condition: () => true,
 
   handle: async (_event, context: AppContext) => {
+    if (isWineEnvironment()) {
+      try {
+        await downloadPortableLauncherUpdate((status) =>
+          sendStatus(context, status),
+        );
+      } catch (error) {
+        sendStatus(context, { state: "error", message: String(error) });
+      }
+      return;
+    }
     logger.log("[UpdateHandler] Requesting download...");
     currentCheckIsSilent = false; // Downloading is usually explicit
     attachUpdateListeners(context);
@@ -354,6 +383,14 @@ export const UpdateInstallHandler: EventHandler<UIUpdateInstallEvent> = {
   condition: () => true,
 
   handle: async (event, _context: AppContext) => {
+    if (isWineEnvironment()) {
+      try {
+        await restartForPortableLauncherUpdate();
+      } catch (error) {
+        sendStatus(_context, { state: "error", message: String(error) });
+      }
+      return;
+    }
     const isSilent = event.payload?.isSilent ?? true;
 
     logger.log(

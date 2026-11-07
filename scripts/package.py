@@ -12,13 +12,16 @@ if '--reuse-payload' not in sys.argv:
     with zipfile.ZipFile(payload, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for file in sorted(launcher.rglob('*')):
             if file.is_file(): z.write(file, file.relative_to(launcher).as_posix())
-release = {'version': '1.4.2-sd.19-local.20261107', 'sha256': hashlib.sha256(payload.read_bytes()).hexdigest(),
+config = json.loads((root / 'release-config.json').read_text(encoding='utf8'))
+release = {'version': config['launcherVersion'], 'build':config['build'], 'sha256': hashlib.sha256(payload.read_bytes()).hexdigest(),
            'features': ['LSFG-VK / MAKO mutually exclusive', 'FSR 4.1.2 INT8 Lite + OptiScaler 0.9.4', 'Reflex OFF', 'Watermark auto', 'repeat launch fix']}
 (root / 'bin/release.json').write_text(json.dumps(release, indent=2), encoding='utf8')
 version = json.loads((root / 'package.json').read_text(encoding='utf8'))['version']
+feed = {'schema':1,'build':config['build'],'version':config['launcherVersion'],'url':f'https://github.com/sunim87/decky-poe-launcher/releases/download/v{version}/POE-Launcher-runtime-v{version}.zip','sha256':release['sha256'],'size':payload.stat().st_size}
+(root / 'bin/launcher-update.json').write_text(json.dumps(feed,indent=2),encoding='utf8')
 output = root.parent / f'Decky-POE-Launcher-v{version}.zip'
 with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
-    for relative in ['main.py', 'manager.py', 'package.json', 'plugin.json', 'README.md', 'LICENSE']:
+    for relative in ['main.py', 'manager.py', 'launcher_updater.py', 'package.json', 'plugin.json', 'README.md', 'LICENSE']:
         z.write(root / relative, 'decky-poe-launcher/' + relative)
     for directory in ['dist', 'assets', 'bin', 'licenses']:
         for file in sorted((root / directory).rglob('*')):

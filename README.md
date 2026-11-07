@@ -1,4 +1,4 @@
-# Decky POE Launcher 0.1.2
+# Decky POE Launcher 0.1.0
 
 [설치 ZIP 다운로드](https://github.com/sunim87/decky-poe-launcher/releases/latest) · [버그 제보](https://github.com/sunim87/decky-poe-launcher/issues)
 
@@ -52,7 +52,7 @@ LSFG-VK·MAKO는 해당 Vulkan 레이어와 원래 설정이 설치되어 있어
 
 처음 자동 업데이트 지원을 설치할 때는 이번 ZIP으로 한 번 설치/복구해야 합니다. 이후에는 매번 Decky 플러그인을 재설치할 필요가 없습니다.
 
-실제 스팀덱에서 GitHub 다운로드와 ‘재시작하여 설치’로 `1.4.2-sd.21` 적용을 확인했습니다. 최신 버전의 중복 다운로드 방지와 기존 게임 데이터 보존도 확인했습니다. 이전 0.1.0 플러그인의 설치/복구 버튼은 자동 업데이트를 지원하지 않으므로, 이미 자동 업데이트를 적용한 런처를 복구할 때는 이번 ZIP의 설치 도구를 사용하세요.
+실제 스팀덱에서 GitHub 다운로드와 ‘재시작하여 설치’로 `1.4.2-sd.21` 적용을 확인했습니다. 최신 버전의 중복 다운로드 방지와 기존 게임 데이터 보존도 확인했습니다. 통합 이전 설치 파일로 복구하면 자동 업데이트 지원이 사라질 수 있으므로, 복구할 때는 현재 릴리스의 설치 ZIP을 사용하세요.
 
 배포자는 빌드 번호를 올리고 `scripts/package.py`와 `scripts/publish.py release`로 릴리스를 만들면 런처 ZIP과 `launcher-update.json`이 함께 올라갑니다. 플러그인 ZIP만 수동 업로드하면 런처 업데이트 정보가 생성되지 않습니다.
 
@@ -76,6 +76,6 @@ LSFG-VK·MAKO는 해당 Vulkan 레이어와 원래 설정이 설치되어 있어
 
 `launcher-source/`는 수정 런처의 소스입니다. 런처의 원 라이선스는 해당 폴더의 `LICENSE`에 있습니다. 플러그인 자체는 MIT 라이선스입니다.
 
-런처 빌드용 외부 DLL을 복구하려면 릴리스 설치 ZIP을 받은 뒤 `python scripts/restore_assets.py Decky-POE-Launcher-v0.1.2.zip`을 실행합니다. 이어 `launcher-source/`에서 `npm ci`, `npm run build:check` 후 electron-builder로 Windows 폴더 패키지를 만듭니다. 배포 폴더를 `python scripts/package.py <win-unpacked 경로>`로 전달합니다.
+런처 빌드용 외부 DLL을 복구하려면 릴리스 설치 ZIP을 받은 뒤 `python scripts/restore_assets.py Decky-POE-Launcher-v0.1.0.zip`을 실행합니다. 이어 `launcher-source/`에서 `npm ci`, `npm run build:check` 후 electron-builder로 Windows 폴더 패키지를 만듭니다. 배포 폴더를 `python scripts/package.py <win-unpacked 경로>`로 전달합니다.
 
 버그 제보: https://github.com/sunim87/decky-poe-launcher/issues

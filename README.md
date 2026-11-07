@@ -1,4 +1,4 @@
-# Decky POE Launcher 0.1.1
+# Decky POE Launcher 0.1.2
 
 [설치 ZIP 다운로드](https://github.com/sunim87/decky-poe-launcher/releases/latest) · [버그 제보](https://github.com/sunim87/decky-poe-launcher/issues)
 
@@ -74,6 +74,6 @@ LSFG-VK·MAKO는 해당 Vulkan 레이어와 원래 설정이 설치되어 있어
 
 `launcher-source/`는 수정 런처의 소스입니다. 런처의 원 라이선스는 해당 폴더의 `LICENSE`에 있습니다. 플러그인 자체는 MIT 라이선스입니다.
 
-런처 빌드용 외부 DLL을 복구하려면 릴리스 설치 ZIP을 받은 뒤 `python scripts/restore_assets.py Decky-POE-Launcher-v0.1.1.zip`을 실행합니다. 이어 `launcher-source/`에서 `npm ci`, `npm run build:check` 후 electron-builder로 Windows 폴더 패키지를 만듭니다. 배포 폴더를 `python scripts/package.py <win-unpacked 경로>`로 전달합니다.
+런처 빌드용 외부 DLL을 복구하려면 릴리스 설치 ZIP을 받은 뒤 `python scripts/restore_assets.py Decky-POE-Launcher-v0.1.2.zip`을 실행합니다. 이어 `launcher-source/`에서 `npm ci`, `npm run build:check` 후 electron-builder로 Windows 폴더 패키지를 만듭니다. 배포 폴더를 `python scripts/package.py <win-unpacked 경로>`로 전달합니다.
 
 버그 제보: https://github.com/sunim87/decky-poe-launcher/issues

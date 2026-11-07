@@ -38,7 +38,11 @@ def validate_manifest(data):
 
 
 def digest(file):
-    with file.open('rb') as stream: return hashlib.file_digest(stream, 'sha256').hexdigest()
+    # Steam Linux Runtime sniper ships Python 3.9; file_digest requires 3.11.
+    value = hashlib.sha256()
+    with file.open('rb') as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b''): value.update(block)
+    return value.hexdigest()
 
 
 def ensure_stopped():

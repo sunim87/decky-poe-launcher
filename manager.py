@@ -114,6 +114,7 @@ class Manager:
             'export STEAM_COMPAT_DATA_PATH="$base/compatdata"',
             'export POE_PROTON_PATH=' + q(str(proton)),
             'export POE_LAUNCHER_BASE="$base"',
+            'mkdir -p -- "$STEAM_COMPAT_DATA_PATH"',
             'export ENABLE_GAMESCOPE_WSI=0', 'export DISABLE_LSFGVK=1',
             'export DISABLE_LSFGVK_EXPERIMENTAL=1', 'export DISABLE_MAKO=1',
             'unset ENABLE_MAKO LSFGVK_PROFILE MAKO_PROFILE',
@@ -173,6 +174,8 @@ class Manager:
         if hashlib.sha256(archive.read_bytes()).hexdigest() != release['sha256']:
             raise ValueError('런처 설치 파일 무결성 확인에 실패했습니다.')
         self.base.mkdir(parents=True, exist_ok=True)
+        # Proton creates pfx.lock before creating its Windows prefix.
+        (self.base / 'compatdata').mkdir(exist_ok=True)
         self.state.mkdir(parents=True, exist_ok=True)
         if not record:
             # Adoption is explicit through Install. Keep the first wrapper backup.

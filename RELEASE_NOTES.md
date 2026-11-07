@@ -10,6 +10,8 @@
 POE 스팀덱 수정 런처를 Decky에서 설치하고 게이밍 모드 라이브러리에 등록하는 첫 버전입니다.
 
 - 런처 설치·복구 및 제거
+- 신규 설치 시 Proton 환경 폴더 누락으로 실행되지 않는 문제 수정 (`compatdata/pfx.lock` 오류)
+- 리전고2 / Bazzite 45에서 새 Proton 환경 생성과 Steam 라이브러리를 통한 런처 실행 확인
 - Proton 10.0 / Steam Linux Runtime 3.0 (sniper)이 없으면 Steam으로 함께 설치한 뒤 런처 설치 계속 진행
 - 이미 설치된 필수 도구와 다른 Steam 라이브러리의 도구 인식
 - Steam 바로가기와 세로/가로 표지·배경·로고·아이콘 자동 등록·제거

@@ -123,6 +123,16 @@ class Tests(unittest.TestCase):
             self.manager.prepare_install('123')
         self.assertFalse(self.manager.app.exists())
 
+    def test_fresh_install_creates_proton_parent_before_first_launch(self):
+        self.assertFalse((self.manager.base / 'compatdata').exists())
+        self.manager.prepare_install('123')
+        prefix = self.manager.base / 'compatdata'
+        self.assertTrue(prefix.is_dir())
+        # This failed on a fresh Bazzite install before Proton could initialize.
+        with (prefix / 'pfx.lock').open('w') as lock: lock.write('lock')
+        wrapper = self.manager.wrapper.read_text()
+        self.assertLess(wrapper.index('mkdir -p -- "$STEAM_COMPAT_DATA_PATH"'), wrapper.index(' --verb=run -- '))
+
     def test_dependency_waits_for_steam_download_completion(self):
         manifest = self.manager.steam / 'steamapps/appmanifest_3658110.acf'
         manifest.write_text('"StateFlags" "1026"')

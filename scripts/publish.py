@@ -35,7 +35,7 @@ if sys.argv[1] == 'create':
         if error.code != 404: raise
         repo = request('/user/repos', {'name':'decky-poe-launcher','description':'Steam Deck용 POE 런처 설치·제거와 Steam 라이브러리 이미지 자동 등록 Decky 플러그인', 'private':False,'has_issues':True,'auto_init':False})
     print(json.dumps({'url':repo['html_url'],'size':repo['size'],'default_branch':repo['default_branch']}))
-elif sys.argv[1] == 'release':
+elif sys.argv[1] in ['release', 'replace-assets']:
     sha = subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()
     body = (root / 'RELEASE_NOTES.md').read_text(encoding='utf8')
     try: release = request('/repos/' + REPO + '/releases/tags/' + tag)
@@ -49,12 +49,20 @@ elif sys.argv[1] == 'release':
         content = asset.read_bytes()
         existing = next((a for a in release['assets'] if a['name'] == name), None)
         if existing:
-            if existing.get('digest') != 'sha256:' + hashlib.sha256(content).hexdigest(): raise RuntimeError('Different release asset already exists: '+name)
-            continue
-        url = release['upload_url'].split('{')[0] + '?name=' + urllib.parse.quote(name)
-        result = request(url, content, method='POST', binary=True)
-        assert result['size'] == asset.stat().st_size
+            if existing.get('digest') == 'sha256:' + hashlib.sha256(content).hexdigest(): continue
+            if sys.argv[1] != 'replace-assets': raise RuntimeError('Different release asset already exists: '+name)
+        upload_name = name + '.replacement' if existing else name
+        url = release['upload_url'].split('{')[0] + '?name=' + urllib.parse.quote(upload_name)
+        staged = next((a for a in release['assets'] if a['name'] == upload_name), None) if existing else None
+        result = staged or request(url, content, method='POST', binary=True)
+        assert result['size'] == asset.stat().st_size and result.get('digest') == 'sha256:' + hashlib.sha256(content).hexdigest()
+        if existing:
+            request('/repos/'+REPO+'/releases/assets/'+str(existing['id']), method='DELETE')
+            request('/repos/'+REPO+'/releases/assets/'+str(result['id']), {'name':name}, method='PATCH')
         print('Uploaded',name,result['size'],flush=True)
+    if sys.argv[1] == 'replace-assets':
+        request('/repos/'+REPO+'/git/refs/tags/'+tag, {'sha':sha,'force':True}, method='PATCH')
+        release = request('/repos/'+REPO+'/releases/'+str(release['id']), {'body':body,'make_latest':'true'}, method='PATCH')
     if release['draft']: release = request('/repos/'+REPO+'/releases/'+str(release['id']),{'draft':False},method='PATCH')
     print(release['html_url'])
 elif sys.argv[1] == 'verify':

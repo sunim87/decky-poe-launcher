@@ -2,12 +2,14 @@ import { callable, definePlugin, toaster } from '@decky/api';
 import { ButtonItem, PanelSection, PanelSectionRow, staticClasses } from '@decky/ui';
 import { useEffect, useRef, useState } from 'react';
 import { FaDragon } from 'react-icons/fa';
+import { Dependencies, ensureDependencies } from './dependencies';
 
 declare const SteamClient: any;
 declare const App: any;
 declare const appStore: any;
 type Reply = { ok: boolean; error?: string; installed?: boolean; registered?: boolean; version?: string; appid?: number; existing?: number; name?: string; exe?: string; options?: string; home?: string; icon?: string; type?: number; data?: string };
 const status = callable<[user: string], Reply>('status');
+const dependencies = callable<[user: string], Dependencies>('installation_dependencies');
 const prepare = callable<[user: string], Reply>('prepare_install');
 const finish = callable<[user: string, appid: number], Reply>('finish_install');
 const removal = callable<[user: string], Reply>('prepare_remove');
@@ -31,6 +33,8 @@ function assertStopped(id: number) {
 
 async function install(progress: (message: string) => void) {
   const user = account();
+  progress('필수 Steam 도구 확인 중…');
+  await ensureDependencies(SteamClient, () => dependencies(user), progress);
   progress('런처 설치 파일 확인·설치 중…');
   const reply = checked(await prepare(user));
   let id = reply.existing || 0;
@@ -105,7 +109,7 @@ function Content() {
     <PanelSectionRow><div style={{ fontSize: 13, marginBottom: 12 }}>카카오 POE1·POE2 · LSFG-VK / MAKO · FSR 4.1.2 Lite<br />{current?.installed ? `설치됨 · ${current.version || '기존 버전'}` : '미설치'}{current?.registered ? ' · 라이브러리 등록됨' : ''}</div></PanelSectionRow>
     <PanelSectionRow><ButtonItem layout="below" disabled={busy} onClick={() => void run(false)}>{busy ? '작업 중…' : current?.installed ? '런처 설치/복구' : '런처 설치'}</ButtonItem></PanelSectionRow>
     <PanelSectionRow><ButtonItem layout="below" disabled={busy || !current?.appid} onClick={() => void run(true)}>런처 및 라이브러리 제거</ButtonItem></PanelSectionRow>
-    <PanelSectionRow><div style={{ fontSize: 12, whiteSpace: 'pre-wrap', marginTop: 12 }}>{message || 'Proton 10.0과 Steam Linux Runtime 3.0(sniper)이 필요합니다.\n설치·제거 전 게임과 런처를 종료하세요.\n제거 시 POE 게임과 저장 데이터는 보존합니다.'}</div></PanelSectionRow>
+    <PanelSectionRow><div style={{ fontSize: 12, whiteSpace: 'pre-wrap', marginTop: 12 }}>{message || 'Proton 10.0과 Steam Linux Runtime 3.0(sniper)이 없으면 함께 설치합니다.\n설치·제거 전 게임과 런처를 종료하세요.\n제거 시 POE 게임과 저장 데이터는 보존합니다.'}</div></PanelSectionRow>
   </PanelSection>;
 }
 

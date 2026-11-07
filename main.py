@@ -24,6 +24,7 @@ class Plugin:
             return {'ok': False, 'error': str(error)}
 
     async def status(self, user): return await self._call('status', user)
+    async def installation_dependencies(self, user): return await self._call('installation_dependencies', user)
     async def prepare_install(self, user): return await self._call('prepare_install', user)
     async def finish_install(self, user, appid): return await self._call('finish_install', user, appid)
     async def prepare_remove(self, user): return await self._call('prepare_remove', user)

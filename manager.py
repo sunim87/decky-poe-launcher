@@ -13,6 +13,8 @@ import zipfile
 
 NAME = 'POE2 Launcher'
 ASSETS = {'capsule': 0, 'hero': 1, 'logo': 2, 'wide': 3}
+DEPENDENCIES = [(3658110, 'Proton 10.0', 'Proton 10.0/proton'),
+                (1628350, 'Steam Linux Runtime 3.0 (sniper)', 'SteamLinuxRuntime_sniper/_v2-entry-point')]
 
 
 def shortcuts(data):
@@ -126,6 +128,34 @@ class Manager:
             'done', '',
         ])
 
+    def dependency_paths(self):
+        libraries = [self.steam]
+        folders = self.steam / 'steamapps/libraryfolders.vdf'
+        if folders.is_file():
+            for value in re.findall(r'"path"\s*"((?:\\.|[^"\\])*)"', folders.read_text(encoding='utf8')):
+                library = Path(value.replace('\\\\', '\\').replace('\\"', '"'))
+                if library.is_absolute() and library not in libraries: libraries.append(library)
+        result = {}
+        for appid, _, relative in DEPENDENCIES:
+            for library in libraries:
+                executable = library / 'steamapps/common' / relative
+                manifest = library / 'steamapps' / f'appmanifest_{appid}.acf'
+                if not executable.is_file(): continue
+                # Files may appear before Steam finishes extracting the tool.
+                if manifest.is_file():
+                    flags = re.search(r'"StateFlags"\s*"(\d+)"', manifest.read_text(encoding='utf8'))
+                    if not flags or int(flags[1]) != 4: continue
+                result[appid] = executable
+                break
+        return result
+
+    def installation_dependencies(self, user):
+        self.account(user)
+        self.ensure_stopped()
+        paths = self.dependency_paths()
+        return {'ok': True, 'library': str(self.steam), 'dependencies': [
+            {'appid': appid, 'name': name, 'installed': appid in paths} for appid, name, _ in DEPENDENCIES]}
+
     def prepare_install(self, user):
         self.account(user)
         self.ensure_stopped()
@@ -134,10 +164,10 @@ class Manager:
         if len(existing) > 1: raise ValueError('동일한 런처 바로가기가 여러 개 있습니다.')
         if any(e.get('AppName') == NAME and not self.matches(e) for e in self.entries(user)):
             raise ValueError('같은 이름의 다른 바로가기가 있습니다. 이름을 변경하세요.')
-        proton = self.steam / 'steamapps/common/Proton 10.0/proton'
-        runtime = self.steam / 'steamapps/common/SteamLinuxRuntime_sniper/_v2-entry-point'
-        if not proton.is_file() or not runtime.is_file():
-            raise ValueError('Steam에서 Proton 10.0과 Steam Linux Runtime 3.0 (sniper)을 먼저 설치하세요.')
+        paths = self.dependency_paths()
+        if any(appid not in paths for appid, _, _ in DEPENDENCIES):
+            raise ValueError('필수 Steam 도구 설치가 아직 끝나지 않았습니다. Steam 다운로드 상태를 확인하고 설치를 다시 눌러주세요.')
+        proton, runtime = paths[3658110], paths[1628350]
         archive = self.root / 'bin/launcher.zip'
         release = json.loads((self.root / 'bin/release.json').read_text())
         if hashlib.sha256(archive.read_bytes()).hexdigest() != release['sha256']:

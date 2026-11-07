@@ -115,5 +115,30 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, '압축'): self.manager.prepare_install('123')
         self.assertFalse((self.manager.base / 'escape').exists())
 
+    def test_dependencies_only_report_missing_tools(self):
+        (self.manager.steam / 'steamapps/common/Proton 10.0/proton').unlink()
+        reply = self.manager.installation_dependencies('123')
+        self.assertEqual([d['appid'] for d in reply['dependencies'] if not d['installed']], [3658110])
+        with self.assertRaisesRegex(ValueError, '필수 Steam 도구'):
+            self.manager.prepare_install('123')
+        self.assertFalse(self.manager.app.exists())
+
+    def test_dependency_waits_for_steam_download_completion(self):
+        manifest = self.manager.steam / 'steamapps/appmanifest_3658110.acf'
+        manifest.write_text('"StateFlags" "1026"')
+        self.assertFalse(self.manager.installation_dependencies('123')['dependencies'][0]['installed'])
+        manifest.write_text('"StateFlags" "4"')
+        self.assertTrue(self.manager.installation_dependencies('123')['dependencies'][0]['installed'])
+
+    def test_tools_on_another_library_are_used_in_wrapper(self):
+        (self.manager.steam / 'steamapps/common/Proton 10.0/proton').unlink()
+        sd = self.home / 'SD card/SteamLibrary'
+        proton = sd / 'steamapps/common/Proton 10.0/proton'
+        proton.parent.mkdir(parents=True); proton.write_text('tool')
+        (self.manager.steam / 'steamapps/libraryfolders.vdf').write_text('"libraryfolders" { "1" { "path" "'+sd.as_posix()+'" } }')
+        self.assertTrue(all(d['installed'] for d in self.manager.installation_dependencies('123')['dependencies']))
+        self.manager.prepare_install('123')
+        self.assertIn(str(proton), self.manager.wrapper.read_text())
+
 
 if __name__ == '__main__': unittest.main()

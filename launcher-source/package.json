@@ -1,0 +1,88 @@
+{
+  "name": "poe2-unofficial-launcher",
+  "private": true,
+  "version": "1.4.2-sd.19",
+  "description": "Unofficial Launcher for Path of Exile & Path of Exile 2",
+  "author": {
+    "name": "NERDHEAD LAB",
+    "email": "nerdlab.kr@gmail.com"
+  },
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NERDHEAD-lab/POE2-unofficial-launcher.git"
+  },
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "setup": "node -e \"if(!require('fs').existsSync('node_modules')) { require('child_process').execSync('npm install', {stdio: 'inherit'}) }\"",
+    "dev": "chcp 65001 && vite",
+    "dev:wsl": "command -v pwsh.exe >/dev/null && PS=pwsh.exe || PS=powershell.exe; \"$PS\" -NoProfile -Command \"chcp 65001; npm run dev\"",
+    "dev:crash:immediate": "chcp 65001 && cross-env VITE_TEST_CRASH_MODE=IMMEDIATE vite",
+    "dev:crash:delayed": "chcp 65001 && cross-env VITE_TEST_CRASH_MODE=DELAYED vite",
+    "dev:crash:null": "chcp 65001 && cross-env VITE_TEST_CRASH_MODE=NULL_REF vite",
+    "dev:test": "chcp 65001 && cross-env VITE_SHOW_GAME_WINDOW=true vite",
+    "build": "tsc && vite build && electron-builder",
+    "build:check": "tsc && vite build",
+    "package": "electron-builder",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write .",
+    "roadmap:issue-body": "node scripts/build-roadmap-issue-body.cjs",
+    "roadmap:notice": "node scripts/build-roadmap-notice.cjs",
+    "test": "vitest",
+    "prepare": "husky"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "axios": "^1.13.4",
+    "dompurify": "^3.3.1",
+    "electron-store": "^11.0.2",
+    "electron-updater": "^6.1.7",
+    "fonteditor-core": "^2.6.3",
+    "github-markdown-css": "^5.9.0",
+    "jszip": "^3.10.1",
+    "marked": "^18.0.0",
+    "node-html-parser": "^7.0.2",
+    "opentype.js": "^1.3.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.0",
+    "@commitlint/config-conventional": "^21.2.0",
+    "@eslint/js": "^10.0.1",
+    "@types/chrome": "^0.2.0",
+    "@types/opentype.js": "^1.3.3",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "@vitest/ui": "^4.0.17",
+    "cross-env": "^10.1.0",
+    "electron": "^40.0.0",
+    "electron-builder": "^26.0.0",
+    "esbuild": "^0.28.0",
+    "eslint": "^10.4.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import-x": "^4.16.2",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.0",
+    "globals": "^17.0.0",
+    "husky": "^9.0.11",
+    "jsdom": "^29.0.0",
+    "lint-staged": "^17.0.0",
+    "prettier": "^3.2.5",
+    "typescript": "^6.0.0",
+    "typescript-eslint": "^8.53.0",
+    "vite": "^8.0.0",
+    "vite-plugin-electron": "^1.0.0",
+    "vitest": "^4.0.17"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  }
+}

@@ -1,0 +1,349 @@
+import { AppConfig, ConfigDefinition } from "./types";
+
+export const CONFIG_METADATA: Record<string, ConfigDefinition> = {
+  FSR_LITE_ENABLED: {
+    key: "fsrLiteEnabled",
+    name: "FSR 4.1.2 INT8 Lite",
+    category: "Performance",
+    description:
+      "POE2용 OptiScaler 0.9.4와 FSR Lite 설치 및 해제. 게임 종료 후 변경합니다.",
+  },
+  FRAME_GENERATION_MODE: {
+    key: "frameGenerationMode",
+    name: "Frame Generation Engine",
+    category: "Performance",
+    description: "프레임 생성 엔진 선택. 변경 후 게임 재실행 시 적용됩니다.",
+  },
+  LAUNCHER_VERSION: {
+    key: "launcherVersion",
+    name: "Launcher Version",
+    category: "Info",
+    description: "현재 런처의 버전 정보를 기록합니다. (자동 관리)",
+  },
+  ACTIVE_GAME: {
+    key: "activeGame",
+    name: "Active Game",
+    category: "Game",
+    description: "런처에서 현재 선택된 게임 (POE1 또는 POE2)을 결정합니다.",
+  },
+  SERVICE_CHANNEL: {
+    key: "serviceChannel",
+    name: "Service Channel",
+    category: "General",
+    description:
+      "게임을 실행할 서비스 플랫폼 (Kakao Games 또는 GGG)을 설정합니다.",
+  },
+  AUTO_LAUNCH: {
+    key: "autoLaunch",
+    name: "Auto Launch",
+    category: "General",
+    description: "컴퓨터 시작 시 앱을 자동으로 실행합니다.",
+  },
+  START_MINIMIZED: {
+    key: "startMinimized",
+    name: "Start Minimized",
+    category: "General",
+    description: "자동 실행 시 트레이로 최소화하여 시작합니다.",
+  },
+  CLOSE_ACTION: {
+    key: "closeAction",
+    name: "Close Action",
+    category: "General",
+    description: "창 닫기 버튼을 눌렀을 때의 동작을 설정합니다.",
+  },
+  QUIT_ON_GAME_START: {
+    key: "quitOnGameStart",
+    name: "Quit on Game Start",
+    category: "General",
+    description: "게임 실행 시 런처를 자동으로 닫습니다 (닫기 설정을 따름).",
+  },
+  AUTO_GAME_START_AFTER_FIX: {
+    key: "autoGameStartAfterFix",
+    name: "Auto Start Game after Fix",
+    category: "General",
+    description:
+      "패치 오류 자동 수정 완료 후 게임을 자동으로 다시 시작할지 설정합니다.",
+  },
+  THEME_CACHE: {
+    key: "themeCache",
+    name: "Theme Cache",
+    category: "Appearance",
+    description:
+      "각 게임별로 추출된 배경화면 테마 색상 및 최적화를 위한 이미지 해시 데이터를 저장합니다.",
+  },
+  AUTO_FIX_PATCH_ERROR: {
+    key: "autoFixPatchError",
+    name: "Auto Fix Patch Error",
+    category: "Patch",
+    description: "패치 오류 감지 시 자동으로 복구를 시도할지 설정합니다.",
+  },
+  BACKUP_PATCH_FILES: {
+    key: "backupPatchFiles",
+    name: "Backup Patch Files",
+    category: "Patch",
+    description: "패치 파일 수정 전 원본 파일을 백업할지 설정합니다.",
+  },
+  DEV_MODE: {
+    key: "dev_mode",
+    name: "Developer Mode",
+    category: "Debug",
+    description: "개발자 모드 활성화 여부를 설정합니다.",
+  },
+  DEBUG_CONSOLE: {
+    key: "debug_console",
+    name: "Debug Console",
+    category: "Debug",
+    description: "디버그 콘솔 표시 여부를 설정합니다 (개발자 모드 필요).",
+  },
+  SHOW_INACTIVE_WINDOWS: {
+    key: "show_inactive_windows",
+    name: "Show Inactive Windows",
+    category: "Debug",
+    description:
+      "숨겨진 윈도우(백그라운드 작업 등)를 화면에 표시할지 설정합니다 (개발자 모드 필요).",
+  },
+  SHOW_INACTIVE_WINDOW_CONSOLE: {
+    key: "show_inactive_window_console",
+    name: "Show Inactive Window Console",
+    category: "Debug",
+    description:
+      "숨겨진 윈도우의 개발자 도구(콘솔)를 표시할지 설정합니다 (개발자 모드 필요).",
+  },
+  SHOW_ONBOARDING: {
+    key: "showOnboarding",
+    name: "Show Onboarding",
+    category: "General",
+    description: "앱 최초 실행 시 온보딩 위저드를 표시할지 여부를 설정합니다.",
+  },
+  NEWS_OPEN_MODE: {
+    key: "newsOpenMode",
+    name: "News Open Mode",
+    category: "General",
+    description: "게시글을 목록 안에서 펼칠지 별도 모달로 열지 선택합니다.",
+  },
+  PROCESS_WATCH_MODE: {
+    key: "processWatchMode",
+    name: "Game Process Watch Mode",
+    category: "Performance",
+    description:
+      "런처가 백그라운드 상태일 때 감시 모드를 설정합니다. ('resource-saving' | 'always-on')",
+  },
+  AGGRESSIVE_PATCH_MODE: {
+    key: "aggressivePatchMode",
+    name: "Aggressive Patch Mode",
+    category: "Patch",
+    description:
+      "한국인 모드: 패치 오류 발생 시 재시도 대기를 생략하고 즉시 대응합니다. 오류 탐지 시 프로세스를 강제 종료하여 즉각적인 자동 복구 단계를 시작합니다.",
+  },
+  SKIP_DAUM_GAME_STARTER_UAC: {
+    key: "skipDaumGameStarterUac",
+    name: "Skip Daum Game Starter UAC",
+    category: "General",
+    description:
+      "Daum Game Starter가 관리자 권한을 요구하지 않도록 레지스트리를 수정하여 실행합니다. (권장)",
+  },
+  AUTO_RESOLUTION: {
+    key: "autoResolution",
+    name: "Automatic Resolution",
+    category: "Display",
+    description: "게임 실행 시 화면 해상도를 자동으로 조정할지 설정합니다.",
+  },
+  RESOLUTION_MODE: {
+    key: "resolutionMode",
+    name: "Resolution Mode",
+    category: "Display",
+    description: "자동 해상도 조정 시 사용할 해상도를 선택합니다.",
+  },
+  KAKAO_ACCOUNT_ID: {
+    key: "kakaoAccountId",
+    name: "Kakao Account ID",
+    category: "Info",
+    description: "마지막으로 로드된 카카오 계정 ID를 캐싱합니다. (자동 관리)",
+  },
+  GGG_ACCOUNT_ID: {
+    key: "gggAccountId",
+    name: "GGG Account ID",
+    category: "Info",
+    description: "마지막으로 로드된 GGG 계정 ID를 캐싱합니다. (자동 관리)",
+  },
+  KNOWN_GAME_VERSIONS: {
+    key: "knownGameVersions",
+    name: "Known Game Versions",
+    category: "Info",
+    description:
+      "각 게임 및 서비스별 마지막으로 감지된 버전과 WebRoot 정보를 저장합니다. (자동 관리)",
+  },
+  GAME_INSTALL_PATHS: {
+    key: "gameInstallPaths",
+    name: "Game Install Paths",
+    category: "Game",
+    description:
+      "각 게임 및 서비스별 설치 경로를 저장합니다. 레지스트리에서 확인된 경로는 자동으로 캐싱됩니다.",
+  },
+  GAME_INSTALL_PATH_CONFLICT_RESOLUTIONS: {
+    key: "gameInstallPathConflictResolutions",
+    name: "Game Install Path Conflict Resolutions",
+    category: "Game",
+    description:
+      "사용자가 런처 설정 경로를 유지하기로 확인한 레지스트리/설정 경로 충돌을 저장합니다. (자동 관리)",
+  },
+  REMOTE_THEME_SETTINGS: {
+    key: "remoteThemeSettings",
+    name: "Remote Theme Settings",
+    category: "Appearance",
+    description:
+      "원격 테마 관리 시스템의 설정(자동 적용 여부, 선택된 테마 등)을 저장합니다. (자동 관리)",
+  },
+  PATCH_RESERVATIONS: {
+    key: "patchReservations",
+    name: "Patch Reservations",
+    category: "Patch",
+    description: "게임 패치 자동 예약 목록을 저장합니다. (자동 관리)",
+  },
+  SILENT_PATCH_NOTIFICATION: {
+    key: "silentPatchNotification",
+    name: "Do Not Disturb Mode",
+    category: "Patch",
+    description:
+      "패치 예약 실행 시 윈도우 알림을 표시하지 않습니다. (방해 금지 모드)",
+  },
+  TERMINATE_AFTER_PATCH: {
+    key: "terminateAfterPatch",
+    name: "Auto Close After Patch",
+    category: "Patch",
+    description: "패치 예약 성공 시 게임 및 런처를 자동으로 종료합니다.",
+  },
+  APPLIED_FONTS: {
+    key: "appliedFonts",
+    name: "Applied Fonts",
+    category: "Appearance",
+    description:
+      "각 게임 및 서비스별로 현재 적용된 커스텀 폰트 정보를 저장합니다. (자동 관리)",
+  },
+  FONT_SCALE_NOTO: {
+    key: "fontScaleNoto",
+    name: "Noto Font Scale",
+    category: "Appearance",
+    description:
+      "Noto Sans CJK TC 커스텀 폰트의 크기 보정(%). 50~150, 기본 100. (커스텀 폰트 상세 설정에서 관리)",
+  },
+  FONT_SCALE_SPOQA: {
+    key: "fontScaleSpoqa",
+    name: "Spoqa Font Scale",
+    category: "Appearance",
+    description:
+      "Spoqa Han Sans Neo 커스텀 폰트의 크기 보정(%). 50~150, 기본 100. (커스텀 폰트 상세 설정에서 관리)",
+  },
+  FONT_MUTATION_SCHEMA: {
+    key: "fontMutationSchema",
+    name: "Font Mutation Schema",
+    category: "Appearance",
+    description:
+      "마지막으로 폰트를 설치한 변조 스키마 버전입니다. 마이그레이션 판정에 사용됩니다. (자동 관리)",
+  },
+};
+
+// 기존 코드와의 호환성을 위한 키 매핑
+export const CONFIG_KEYS = {
+  LAUNCHER_VERSION: CONFIG_METADATA.LAUNCHER_VERSION.key,
+  ACTIVE_GAME: CONFIG_METADATA.ACTIVE_GAME.key,
+  SERVICE_CHANNEL: CONFIG_METADATA.SERVICE_CHANNEL.key,
+  AUTO_FIX_PATCH_ERROR: CONFIG_METADATA.AUTO_FIX_PATCH_ERROR.key,
+  AUTO_GAME_START_AFTER_FIX: CONFIG_METADATA.AUTO_GAME_START_AFTER_FIX.key,
+  BACKUP_PATCH_FILES: CONFIG_METADATA.BACKUP_PATCH_FILES.key,
+  THEME_CACHE: CONFIG_METADATA.THEME_CACHE.key,
+  DEV_MODE: CONFIG_METADATA.DEV_MODE.key,
+  DEBUG_CONSOLE: CONFIG_METADATA.DEBUG_CONSOLE.key,
+  AUTO_LAUNCH: CONFIG_METADATA.AUTO_LAUNCH.key,
+  START_MINIMIZED: CONFIG_METADATA.START_MINIMIZED.key,
+  CLOSE_ACTION: CONFIG_METADATA.CLOSE_ACTION.key,
+  QUIT_ON_GAME_START: CONFIG_METADATA.QUIT_ON_GAME_START.key,
+  SHOW_ONBOARDING: CONFIG_METADATA.SHOW_ONBOARDING.key,
+  NEWS_OPEN_MODE: CONFIG_METADATA.NEWS_OPEN_MODE.key,
+  PROCESS_WATCH_MODE: CONFIG_METADATA.PROCESS_WATCH_MODE.key,
+  AGGRESSIVE_PATCH_MODE: CONFIG_METADATA.AGGRESSIVE_PATCH_MODE.key,
+  SKIP_DAUM_GAME_STARTER_UAC: CONFIG_METADATA.SKIP_DAUM_GAME_STARTER_UAC.key,
+  AUTO_RESOLUTION: CONFIG_METADATA.AUTO_RESOLUTION.key,
+  RESOLUTION_MODE: CONFIG_METADATA.RESOLUTION_MODE.key,
+  KAKAO_ACCOUNT_ID: CONFIG_METADATA.KAKAO_ACCOUNT_ID.key,
+  GGG_ACCOUNT_ID: CONFIG_METADATA.GGG_ACCOUNT_ID.key,
+  KNOWN_GAME_VERSIONS: CONFIG_METADATA.KNOWN_GAME_VERSIONS.key,
+  GAME_INSTALL_PATHS: CONFIG_METADATA.GAME_INSTALL_PATHS.key,
+  GAME_INSTALL_PATH_CONFLICT_RESOLUTIONS:
+    CONFIG_METADATA.GAME_INSTALL_PATH_CONFLICT_RESOLUTIONS.key,
+  REMOTE_THEME_SETTINGS: CONFIG_METADATA.REMOTE_THEME_SETTINGS.key,
+  PATCH_RESERVATIONS: CONFIG_METADATA.PATCH_RESERVATIONS.key,
+  SILENT_PATCH_NOTIFICATION: CONFIG_METADATA.SILENT_PATCH_NOTIFICATION.key,
+  TERMINATE_AFTER_PATCH: CONFIG_METADATA.TERMINATE_AFTER_PATCH.key,
+  APPLIED_FONTS: CONFIG_METADATA.APPLIED_FONTS.key,
+} as const;
+
+export const DEFAULT_CONFIG: AppConfig = {
+  launcherVersion: "",
+  activeGame: "POE1",
+  serviceChannel: "Kakao Games",
+  themeCache: {},
+  autoFixPatchError: false,
+  autoGameStartAfterFix: false,
+  backupPatchFiles: true,
+  dev_mode: false,
+  debug_console: false,
+  show_inactive_windows: false,
+  show_inactive_window_console: false,
+  autoLaunch: false,
+  startMinimized: false,
+  closeAction: "minimize",
+  quitOnGameStart: false,
+  showOnboarding: true,
+  newsOpenMode: "inline",
+  processWatchMode: "resource-saving",
+  aggressivePatchMode: false,
+  lsfgEnabled: false,
+  frameGenerationMode: "",
+  fsrLiteEnabled: false,
+  lsfgMultiplier: "2",
+  poe1QuietSoundEnabled: false,
+  skipDaumGameStarterUac: false,
+  autoResolution: true,
+  resolutionMode: "1440x960",
+  knownGameVersions: {},
+  gameInstallPaths: {
+    "Kakao Games": {
+      POE1: "",
+      POE2: "",
+    },
+    GGG: {
+      POE1: "",
+      POE2: "",
+    },
+  },
+  gameInstallPathConflictResolutions: {
+    "Kakao Games": {
+      POE1: null,
+      POE2: null,
+    },
+    GGG: {
+      POE1: null,
+      POE2: null,
+    },
+  },
+  remoteThemeSettings: {
+    autoApply: true,
+    selectedThemes: {
+      POE1: "auto",
+      POE2: "auto",
+    },
+  },
+  patchReservations: [],
+  silentPatchNotification: false,
+  terminateAfterPatch: true,
+  appliedFonts: {},
+  fontScaleNoto: 100,
+  fontScaleSpoqa: 100,
+  fontMutationSchema: 1,
+};
+
+export const DEBUG_APP_CONFIG = {
+  TITLE: "Debug Console",
+  HASH: "#debug",
+} as const;

@@ -1,0 +1,195 @@
+import React, { useState, useEffect, useCallback } from "react";
+
+import "../../settings/Settings.css";
+import SettingsContent from "./SettingsContent";
+import SettingsSidebar from "./SettingsSidebar";
+import { SETTINGS_CONFIG } from "../../settings/settings-config";
+import { Toast } from "../ui/Toast";
+
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  initialSettingId?: string;
+}
+
+const SettingsModal: React.FC<Props> = ({
+  isOpen,
+  onClose,
+  initialSettingId,
+}) => {
+  const [activeCatId, setActiveCatId] = useState(() => {
+    if (initialSettingId) {
+      for (const cat of SETTINGS_CONFIG) {
+        const hasItem = cat.sections.some((s) =>
+          s.items.some((i) => i.id === initialSettingId),
+        );
+        if (hasItem) return cat.id;
+      }
+    }
+    return SETTINGS_CONFIG[0].id;
+  });
+
+  // Sync active category when initialSettingId changes (e.g., from external navigation)
+  useEffect(() => {
+    if (isOpen && initialSettingId) {
+      for (const cat of SETTINGS_CONFIG) {
+        const hasItem = cat.sections.some((s) =>
+          s.items.some((i) => i.id === initialSettingId),
+        );
+        if (hasItem) {
+          // Use setTimeout to avoid synchronous setState inside effect (cascading render)
+          const timer = setTimeout(() => {
+            setActiveCatId(cat.id);
+          }, 0);
+          return () => clearTimeout(timer);
+        }
+      }
+    }
+  }, [isOpen, initialSettingId]);
+
+  const [isVisible, setIsVisible] = useState(false);
+  const [isRestartNeeded, setIsRestartNeeded] = useState(false);
+  const [showRestartConfirm, setShowRestartConfirm] = useState(false);
+
+  // Toast State (Lifted)
+  const [toastMsg, setToastMsg] = useState("");
+  const [toastVariant, setToastVariant] = useState<
+    "default" | "success" | "warning" | "error" | "white"
+  >("default");
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Container Ref for Toast Portal (State-based to trigger re-render on mount)
+  const [modalContainer, setModalContainer] = useState<HTMLDivElement | null>(
+    null,
+  );
+
+  const showToast = useCallback(
+    (
+      msg: string,
+      variant:
+        | "default"
+        | "success"
+        | "warning"
+        | "error"
+        | "white" = "default",
+    ) => {
+      setToastMsg(msg);
+      setToastVariant(variant);
+      setToastVisible(true);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => setToastVisible(false), 2000);
+    },
+    [],
+  );
+
+  // Animation & initial focus Logic
+  useEffect(() => {
+    if (isOpen) {
+      // Defer state update to allow transition
+      const raf = requestAnimationFrame(() => setIsVisible(true));
+      return () => cancelAnimationFrame(raf);
+    } else {
+      const timer = setTimeout(() => setIsVisible(false), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  // Prevent click propagation from modal to overlay
+  const handleModalClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
+  const handleCloseAttempt = useCallback(() => {
+    if (isRestartNeeded) {
+      setShowRestartConfirm(true);
+    } else {
+      onClose();
+    }
+  }, [isRestartNeeded, onClose]);
+
+  if (!isVisible && !isOpen) return null;
+
+  const activeCategory =
+    SETTINGS_CONFIG.find((c) => c.id === activeCatId) || SETTINGS_CONFIG[0];
+
+  const handleRelaunch = () => {
+    if (window.electronAPI) {
+      window.electronAPI.relaunchApp();
+    }
+  };
+
+  return (
+    <div
+      className="settings-overlay"
+      onClick={handleCloseAttempt}
+      style={{ opacity: isOpen ? 1 : 0, transition: "opacity 0.2s" }}
+    >
+      <div
+        className="settings-modal"
+        ref={setModalContainer}
+        onClick={handleModalClick}
+      >
+        {/* Shared Toast Notification (Portal to this modal) */}
+        <Toast
+          message={toastMsg}
+          visible={toastVisible}
+          container={modalContainer}
+          variant={toastVariant}
+        />
+
+        {/* Left Sidebar */}
+        <SettingsSidebar
+          categories={SETTINGS_CONFIG}
+          activeCategoryId={activeCatId}
+          onSelectCategory={setActiveCatId}
+        />
+
+        {/* Right Content */}
+        <SettingsContent
+          key={activeCategory.id} // Force remount on category change to reset internal state
+          category={activeCategory}
+          onClose={handleCloseAttempt}
+          onShowToast={showToast}
+          onRestartRequired={() => setIsRestartNeeded(true)}
+          highlightSettingId={initialSettingId}
+        />
+
+        {/* Restart Confirmation Popup */}
+        {showRestartConfirm && (
+          <div
+            className="confirm-overlay"
+            onClick={() => setShowRestartConfirm(false)}
+          >
+            <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="confirm-header">재시작 필요</div>
+              <div className="confirm-body">
+                일부 설정을 적용하려면 프로그램 재시작이 필요합니다. 지금
+                재시작하시겠습니까?
+              </div>
+              <div className="confirm-footer">
+                <button
+                  className="confirm-btn cancel"
+                  onClick={() => {
+                    setShowRestartConfirm(false);
+                    onClose(); // Just close, will apply on next manual restart
+                  }}
+                >
+                  나중에
+                </button>
+                <button
+                  className="confirm-btn primary"
+                  onClick={handleRelaunch}
+                >
+                  지금 재시작
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default SettingsModal;

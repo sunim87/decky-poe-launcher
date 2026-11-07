@@ -1,0 +1,63 @@
+.kakao-maintenance-modal {
+  width: 560px;
+  max-width: min(560px, 92vw);
+}
+
+.kakao-maintenance-header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.kakao-maintenance-modal-icon {
+  color: #dfcf99;
+  font-size: 34px;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.kakao-maintenance-subtitle {
+  margin: 6px 0 0;
+  color: #b8b8b8;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.kakao-maintenance-description {
+  color: #d9d0ad;
+  margin-bottom: 14px;
+}
+
+.kakao-maintenance-modal-details {
+  margin: 0;
+  border-top: 1px solid rgba(223, 207, 153, 0.18);
+}
+
+.kakao-maintenance-modal-row {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: 18px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.kakao-maintenance-modal-row dt {
+  color: #949494;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.kakao-maintenance-modal-row dd {
+  margin: 0;
+  color: #e5e5e5;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 560px) {
+  .kakao-maintenance-modal-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}

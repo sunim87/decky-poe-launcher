@@ -1,0 +1,142 @@
+.alias-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(6px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 20000; /* 전역 최상단 */
+  animation: aliasFadeIn 0.2s ease-out;
+}
+
+.alias-dialog {
+  width: 420px;
+  background: #111111;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.9);
+  overflow: hidden;
+  animation: aliasModalIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.alias-dialog-header {
+  padding: 20px 24px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.alias-dialog-header .material-symbols-outlined {
+  color: var(--theme-accent);
+  font-size: 24px;
+}
+
+.alias-dialog-header h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--theme-accent);
+}
+
+.alias-dialog-body {
+  padding: 24px;
+}
+
+.alias-dialog-body p {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: var(--theme-text);
+  line-height: 1.5;
+}
+
+.alias-input-wrapper {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.alias-input-wrapper input {
+  width: 100%;
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 15px;
+  outline: none;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.alias-input-wrapper input:focus {
+  border-color: var(--theme-accent);
+  background: #222;
+  box-shadow: 0 0 0 3px rgba(223, 207, 153, 0.15); /* 테마 변수 기반 그림자 (알고리즘적 추론) */
+}
+
+.alias-dialog-body small {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.alias-dialog-footer {
+  padding: 16px 24px;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.alias-btn-cancel {
+  padding: 10px 20px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #888;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.alias-btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.alias-btn-confirm {
+  padding: 10px 24px;
+  background: var(--theme-accent);
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.alias-btn-confirm:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.alias-btn-confirm:disabled {
+  background: #333;
+  color: #666;
+  cursor: not-allowed;
+}
+
+@keyframes aliasFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes aliasModalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}

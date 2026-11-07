@@ -1,0 +1,110 @@
+import React, { useState, useEffect } from "react";
+import ReactDOM from "react-dom/client";
+
+import App from "./App";
+import DebugConsole from "./components/DebugConsole";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import FatalErrorModal from "./components/modals/FatalErrorModal";
+import { GameStateProvider } from "./contexts/GameStateContext";
+import { DEBUG_APP_CONFIG } from "../shared/config";
+import { initGamepadNav } from "./utils/gamepad-nav";
+import { logger } from "./utils/logger";
+
+import "./App.css";
+
+// [SteamDeck] 게임패드 연결 시 컨트롤러 포커스 내비게이션 활성화
+initGamepadNav();
+
+const isDebug = window.location.hash === DEBUG_APP_CONFIG.HASH;
+
+if (!isDebug) {
+  logger.log("[Renderer] Renderer Logger initialized.");
+}
+
+export const Root = () => {
+  const [fatalError, setFatalError] = useState<string | null>(null);
+  const [reportData, setReportData] = useState<{
+    errorDetails: string;
+    errorSummary?: string;
+    type: "bug" | "suggestion";
+  } | null>(null);
+  const [launcherVersion, setLauncherVersion] = useState<string>("Unknown");
+
+  useEffect(() => {
+    // Get launcher version on mount
+    if (window.electronAPI && window.electronAPI.getConfig) {
+      window.electronAPI.getConfig("launcherVersion").then((v) => {
+        if (v) setLauncherVersion(v as string);
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (fatalError || reportData) {
+      // Ensure splash screen is removed if an error or report modal occurs
+      const splash = document.getElementById("launcher-splash");
+      if (splash) splash.remove();
+    }
+  }, [fatalError, reportData]);
+
+  useEffect(() => {
+    if (window.electronAPI && window.electronAPI.onFatalError) {
+      const cleanup = window.electronAPI.onFatalError((errorDetails) => {
+        logger.error("[Root] Fatal Error received from Main:", errorDetails);
+        setFatalError(errorDetails);
+      });
+
+      window.electronAPI.reportFatalReady();
+      return cleanup;
+    }
+  }, []);
+
+  useEffect(() => {
+    // Listen for manual report modal trigger
+    const handleShowReport = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        errorDetails: string;
+        errorSummary?: string;
+        type: "bug" | "suggestion";
+      }>;
+      setReportData(customEvent.detail);
+    };
+
+    window.addEventListener("SHOW_REPORT_MODAL", handleShowReport);
+    return () => {
+      window.removeEventListener("SHOW_REPORT_MODAL", handleShowReport);
+    };
+  }, []);
+
+  return (
+    <div id="app-container">
+      {fatalError && (
+        <FatalErrorModal
+          errorDetails={fatalError}
+          launcherVersion={launcherVersion}
+          type="fatal"
+        />
+      )}
+      {reportData && !fatalError && (
+        <FatalErrorModal
+          errorDetails={reportData.errorDetails}
+          errorSummary={reportData.errorSummary}
+          type={reportData.type}
+          launcherVersion={launcherVersion}
+          onClose={() => setReportData(null)}
+        />
+      )}
+      <ErrorBoundary onFatalError={setFatalError}>
+        <GameStateProvider>
+          {isDebug ? <DebugConsole /> : <App />}
+        </GameStateProvider>
+      </ErrorBoundary>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <Root />
+  </React.StrictMode>,
+);

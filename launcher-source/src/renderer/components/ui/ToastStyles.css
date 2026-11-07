@@ -1,0 +1,62 @@
+/* ToastStyles.css */
+.shared-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 40px;
+  transform: translateX(-50%) translateY(10px);
+  background: #1e1e1e;
+  /* STRUCTURED BORDER: Unified color using variable */
+  border: 1px solid var(--toast-accent);
+  border-left: 4px solid var(--toast-accent);
+  color: var(--theme-text, #eee);
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    opacity 0.5s ease-out,
+    transform 0.5s ease-out;
+  z-index: 13000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.shared-toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* --- Shared Toast Variants (Semantic Color Definition) --- */
+.shared-toast.default,
+.shared-toast.success {
+  --toast-accent: var(--theme-accent, #dfcf99);
+  color: #e8f5e9;
+}
+
+.shared-toast.error {
+  --toast-accent: #f44336;
+  color: #ffebee;
+}
+
+.shared-toast.warning {
+  --toast-accent: #ff9800;
+  color: #fff3e0;
+}
+
+.shared-toast.white {
+  --toast-accent: #ffffff;
+  color: #ffffff;
+}
+
+/* Positioning Override based on parent context (for Settings Modal portal) */
+.settings-modal .shared-toast {
+  bottom: 25px;
+  z-index: 13001;
+}

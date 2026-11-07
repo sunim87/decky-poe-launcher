@@ -1,0 +1,42 @@
+{
+  appId: "com.nerdhead.poe2-launcher",
+  productName: "POE2 Unofficial Launcher",
+  directories: {
+    output: "dist",
+  },
+  files: ["dist-electron/**/*", "dist/**/*"],
+  nsis: {
+    // [SteamDeck] 스팀덱에서 터치로 설치 마법사를 조작하지 않도록 원클릭 설치로 전환.
+    // 설치 후 자동 실행되고, 같은 setup.exe를 재실행하면 installer.nsh의 스텁이
+    // 설치된 런처를 바로 실행해준다 (compatdata 경로 수정 불필요).
+    oneClick: true,
+    perMachine: false,
+    allowToChangeInstallationDirectory: false,
+    createDesktopShortcut: true,
+    createStartMenuShortcut: true,
+    shortcutName: "POE2 Unofficial Launcher",
+    include: "build/installer.nsh",
+    guid: "612ccee6-aa48-58b5-9d2e-fdd023b16218",
+  },
+  win: {
+    icon: "build/icon.ico",
+    target: "nsis",
+    asarUnpack: [
+      "dist-electron/workers/**/*",
+      "node_modules/canvas/**/*"
+    ]
+  },
+  extraResources: [
+    {
+      from: "src/main/assets",
+      to: "assets",
+      filter: ["**/*"],
+    },
+  ],
+  publish: {
+    provider: "github",
+    owner: "psp3322",
+    repo: "POE2-unofficial-launcher-for-steamdeck",
+    releaseType: "prerelease",
+  },
+}

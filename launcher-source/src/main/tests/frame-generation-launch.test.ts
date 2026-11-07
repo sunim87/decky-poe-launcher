@@ -1,0 +1,70 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { DEFAULT_CONFIG } from "../../shared/config";
+import { prepareFrameGeneration } from "../game/frame-generation";
+
+const mocks = vi.hoisted(() => ({
+  mkdir: vi.fn(),
+  writeFile: vi.fn(),
+  rename: vi.fn(),
+  readFile: vi.fn(async () => "version = 2\n[global]\nallow_fp16 = true\n"),
+}));
+vi.mock("node:fs/promises", () => ({ ...mocks, default: mocks }));
+vi.mock("electron", () => ({
+  app: {
+    getPath: () =>
+      "C:\\users\\steamuser\\AppData\\Roaming\\POE2 Unofficial Launcher",
+  },
+}));
+vi.mock("../utils/wine", () => ({ isWineEnvironment: () => true }));
+vi.mock("../utils/lsfg-config", () => ({
+  findLinuxHomeZPath: () => "Z:\\home\\deck",
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.stubEnv("POE_PROTON_PATH", "/steam/Proton 10.0/proton");
+  vi.stubEnv(
+    "STEAM_COMPAT_DATA_PATH",
+    "/home/deck/Applications/POE2-Launcher/compatdata",
+  );
+});
+afterEach(() => vi.unstubAllEnvs());
+
+describe("game launch working directory", () => {
+  it.each([
+    [
+      "C:\\Kakaogames\\Path of Exile2\\PathOfExile_KG.exe",
+      "/home/deck/Applications/POE2-Launcher/compatdata/pfx/dosdevices/c:/Kakaogames/Path of Exile2",
+    ],
+    [
+      "Z:\\home\\deck\\Games\\Path of Exile2\\PathOfExile_KG.exe",
+      "/home/deck/Games/Path of Exile2",
+    ],
+  ])(
+    "keeps installed game files discoverable for %s",
+    async (executable, directory) => {
+      const result = await prepareFrameGeneration(
+        { ...DEFAULT_CONFIG, frameGenerationMode: "mako" },
+        executable,
+      );
+      expect(result.workingDirectory).toBe(directory);
+      expect(result.env.ENABLE_MAKO).toBe("1");
+      expect(result.env.DISABLE_LSFGVK).toBe("1");
+      expect(result.helper).toContain(
+        "/POE2 Unofficial Launcher/frame-generation/launch.sh",
+      );
+      expect(mocks.writeFile).toHaveBeenLastCalledWith(
+        expect.stringContaining("launch.sh.tmp"),
+        expect.stringContaining('cd -- "$1"\nshift\n'),
+        "utf8",
+      );
+      expect(mocks.rename).toHaveBeenCalledTimes(2);
+      expect(
+        mocks.writeFile.mock.calls.every(([target]) =>
+          String(target).includes("POE2 Unofficial Launcher"),
+        ),
+      ).toBe(true);
+    },
+  );
+});

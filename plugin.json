@@ -1,0 +1,7 @@
+{
+  "name": "Decky POE Launcher",
+  "author": "sunim87",
+  "flags": [],
+  "api_version": 1,
+  "publish": {"tags": ["launcher", "poe", "korean"], "description": "POE 런처 설치·제거, 게이밍 모드 라이브러리와 이미지 자동 등록"}
+}

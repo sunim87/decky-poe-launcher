@@ -1,0 +1,2500 @@
+/* eslint-disable import-x/order */
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
+
+import {
+  getFrameGenerationMode,
+  toggleFrameGenerationMode,
+} from "../shared/frame-generation";
+import { CONFIG_KEYS, DEFAULT_CONFIG } from "../shared/config";
+import {
+  AppConfig,
+  RunStatus,
+  NewsItem,
+  NewsCategory,
+  NewsOpenMode,
+  ChangelogItem,
+  UpdateStatus,
+  PatchProgress,
+  ThemeDefinition,
+  KakaoMaintenanceInfo,
+  KakaoGameStarterMigrationRequest,
+  GameInstallPathDiagnostics,
+} from "../shared/types";
+import { DOWNLOAD_URLS, SUPPORT_URLS } from "../shared/urls";
+
+import "./App.css";
+import iconGithub from "./assets/icon-github.svg";
+import bannerBottom from "./assets/layout/banner-bottom.png";
+import bgPoe from "./assets/poe1/bg-keepers.png";
+import bgPoe2 from "./assets/poe2/bg-forest.webp";
+import GameSelector from "./components/GameSelector";
+import GameStartButton from "./components/GameStartButton";
+import ChangelogModal from "./components/modals/ChangelogModal";
+import FontCatalogModal from "./components/modals/FontCatalogModal";
+import GamePathDiagnosticModal from "./components/modals/GamePathDiagnosticModal";
+import FontManagerModal from "./components/modals/FontManagerModal";
+import FontMigrationModal from "./components/modals/FontMigrationModal";
+import { ForcedRepairModal } from "./components/modals/ForcedRepairModal";
+import KakaoMaintenanceModal from "./components/modals/KakaoMaintenanceModal";
+import KakaoStarterMigrationModal from "./components/modals/KakaoStarterMigrationModal";
+import KakaoStarterUacModal from "./components/modals/KakaoStarterUacModal";
+import MigrationModal from "./components/modals/MigrationModal";
+import NoticeModal from "./components/modals/NoticeModal";
+import { OnboardingModal } from "./components/modals/OnboardingModal";
+import { PatchFixModal } from "./components/modals/PatchFixModal";
+import { PatchReservationModal } from "./components/modals/PatchReservationModal";
+import NewsDashboard from "./components/news/NewsDashboard";
+import NewsSection from "./components/news/NewsSection";
+import OfficialLinkButtons from "./components/OfficialLinkButtons";
+import ServiceChannelSelector from "./components/ServiceChannelSelector";
+import SettingsModal from "./components/settings/SettingsModal";
+import SupportLinks from "./components/SupportLinks";
+import ThemeRevalidator from "./components/ThemeRevalidator";
+import TitleBar from "./components/TitleBar";
+import UpdateModal from "./components/UpdateModal";
+import { useGameState } from "./contexts/GameStateContext";
+import { VersionService, RemoteVersions } from "./services/VersionService";
+import { getGameStartButtonLabel } from "./utils/game-start-label";
+import { logger } from "./utils/logger";
+import { applyThemeColors, DEFAULT_THEME_COLORS } from "./utils/theme";
+
+// Status Message Configuration Interface
+interface StatusMessageConfig {
+  message: string;
+  timeout: number; // -1 for infinite (sticky), otherwise duration in ms
+}
+
+type KakaoMaintenanceModalInfo = KakaoMaintenanceInfo & {
+  gameId: AppConfig["activeGame"];
+  serviceId: "Kakao Games";
+};
+
+type GamePathModalMode = "conflict" | "missing" | "diagnostic";
+
+type GamePathModalState = {
+  mode: GamePathModalMode;
+  gameId: AppConfig["activeGame"];
+  serviceId: AppConfig["serviceChannel"];
+  diagnostics: GameInstallPathDiagnostics | null;
+  busy: boolean;
+  errorMessage?: string;
+  highlightManual?: boolean;
+  showRegistrySyncConfirm?: boolean;
+  showRegistryClearConfirm?: boolean;
+  manualSaveToastId?: number;
+};
+
+type GamePathSource = "config" | "registry";
+
+// Status Message Mapping (Configuration)
+const STATUS_MESSAGES: Record<RunStatus, StatusMessageConfig> = {
+  idle: { message: "", timeout: 0 }, // [Updated] Clean idle state
+  uninstalled: { message: "설치된 게임을 찾을 수 없습니다.", timeout: -1 }, // Sticky
+  install_check_blocked: {
+    message: "설치 경로 확인이 차단되었습니다.",
+    timeout: -1,
+  },
+  preparing: { message: "실행 절차 준비 중...", timeout: 3000 },
+  processing: { message: "실행 절차 진행 중...", timeout: 3000 },
+  authenticating: { message: "지정 PC 확인 중...", timeout: 3000 },
+  ready: { message: "게임 실행 준비 완료! 잠시 후 실행됩니다.", timeout: 3000 },
+  running: { message: "게임 실행 중", timeout: -1 }, // Sticky
+  stopping: { message: "게임이 종료되었습니다.", timeout: 0 }, // Shown during transition
+  error: { message: "실행 오류 발생", timeout: 3000 },
+};
+
+const DEV_NOTICE_SOURCE = {
+  game: "POE1",
+  service: "GGG",
+  category: "dev-notice",
+} as const;
+
+const NEWS_REFRESH_SOURCES: Array<{
+  game: AppConfig["activeGame"];
+  service: AppConfig["serviceChannel"];
+  category: NewsCategory;
+}> = [
+  DEV_NOTICE_SOURCE,
+  { game: "POE1", service: "GGG", category: "notice" },
+  { game: "POE1", service: "GGG", category: "patch-notes" },
+  { game: "POE2", service: "GGG", category: "notice" },
+  { game: "POE2", service: "GGG", category: "patch-notes" },
+  { game: "POE1", service: "Kakao Games", category: "notice" },
+  { game: "POE1", service: "Kakao Games", category: "patch-notes" },
+  { game: "POE2", service: "Kakao Games", category: "notice" },
+  { game: "POE2", service: "Kakao Games", category: "patch-notes" },
+];
+
+const formatNewsRefreshTime = (lastUpdatedAt: number | null) => {
+  if (!lastUpdatedAt) {
+    return "마지막 확인: 아직 확인 전";
+  }
+
+  const time = new Date(lastUpdatedAt).toLocaleTimeString("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return `마지막 확인: ${time}`;
+};
+
+const formatUnknownError = (error: unknown) => {
+  return error instanceof Error ? error.message : String(error);
+};
+
+const getGamePathSaveErrorMessage = (
+  verification: string,
+  fallback?: string,
+) => {
+  if (verification === "missing") {
+    return fallback || "선택한 폴더에서 게임 실행 파일을 찾을 수 없습니다.";
+  }
+
+  if (verification === "unknown") {
+    return "선택한 폴더의 실행 파일을 확인할 수 없습니다.";
+  }
+
+  return fallback || "게임 경로를 저장하지 못했습니다.";
+};
+
+const NEWS_OPEN_MODE_OPTIONS: Array<{
+  mode: NewsOpenMode;
+  icon: string;
+  label: string;
+}> = [
+  { mode: "inline", icon: "view_agenda", label: "목록에서 펼치기" },
+  { mode: "modal", icon: "open_in_full", label: "팝업으로 열기" },
+];
+
+// Session-level flags or refs
+
+// --- 🛠️ Testing Scenarios (Toggle as needed) ---
+// "DELAYED"   : Crash after 2 seconds (Child component)
+// "IMMEDIATE" : Crash immediately during App render
+// "NULL_REF"  : Crash due to null reference during render
+// "NONE"      : No crash
+const TEST_CRASH_MODE = (import.meta.env.VITE_TEST_CRASH_MODE || "NONE") as
+  "DELAYED" | "IMMEDIATE" | "NULL_REF" | "NONE";
+
+const TestCrashComponent = () => {
+  const [shouldCrash, setShouldCrash] = useState(false);
+
+  useEffect(() => {
+    if (TEST_CRASH_MODE !== "DELAYED") return;
+    const timer = setTimeout(() => {
+      setShouldCrash(true);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (shouldCrash) {
+    throw new Error(
+      "REAL CASE TEST: A child component (TestCrashComponent) has crashed after 2 seconds.\n\n" +
+        "This confirms the ErrorBoundary works and the FatalErrorModal appears over the UI.",
+    );
+  }
+
+  return null;
+};
+
+function App() {
+  // 1. [TEST] Immediate Crash Scenario
+  if (TEST_CRASH_MODE === "IMMEDIATE") {
+    throw new Error(
+      "IMMEDIATE CRASH TEST: App component crashed right at the start of rendering.\n\n" +
+        "This specifically verifies that the main.tsx Root ErrorBoundary can handle failures even before App mounts.",
+    );
+  }
+
+  // 2. [TEST] Null Reference Scenario
+  if (TEST_CRASH_MODE === "NULL_REF") {
+    const badData = null as unknown as { property_of_null: string };
+    console.log(badData.property_of_null); // Explicit crash
+  }
+
+  // Configuration State (Unified)
+  const [config, setConfigState] = useState<AppConfig>(DEFAULT_CONFIG);
+  const [isConfigLoaded, setIsConfigLoaded] = useState(false);
+  const [fsrBusy, setFsrBusy] = useState(false);
+  const [fsrError, setFsrError] = useState("");
+  const fsrPending = useRef(false);
+  const toggleFsrLite = async () => {
+    if (fsrPending.current || !window.electronAPI) return;
+    fsrPending.current = true;
+    setFsrBusy(true);
+    setFsrError("");
+    try {
+      const enabled = !config.fsrLiteEnabled;
+      await window.electronAPI.setConfig("fsrLiteEnabled", enabled);
+      setConfigState((previous) => ({ ...previous, fsrLiteEnabled: enabled }));
+    } catch (error) {
+      setFsrError(String(error));
+    } finally {
+      fsrPending.current = false;
+      setFsrBusy(false);
+    }
+  };
+
+  // [SteamDeck] 덱 전용 UI(lsfg 토글 등) 노출 여부
+  const [isSteamDeck, setIsSteamDeck] = useState(false);
+  useEffect(() => {
+    window.electronAPI
+      ?.isSteamDeck?.()
+      .then((value) => setIsSteamDeck(Boolean(value)))
+      .catch(() => setIsSteamDeck(false));
+  }, []);
+  const currentNewsOpenMode: NewsOpenMode =
+    config.newsOpenMode === "modal" ? "modal" : "inline";
+
+  const [poe1Theme, setPoe1Theme] = useState<
+    | (ThemeDefinition & { assets: Record<string, string>; isRemote: boolean })
+    | null
+  >(null);
+  const [poe2Theme, setPoe2Theme] = useState<
+    | (ThemeDefinition & { assets: Record<string, string>; isRemote: boolean })
+    | null
+  >(null);
+
+  const [isThemesSynced, setIsThemesSynced] = useState(false);
+
+  const activeTheme = useMemo(() => {
+    return (config?.activeGame === "POE1" ? poe1Theme : poe2Theme) || null;
+  }, [config?.activeGame, poe1Theme, poe2Theme]);
+
+  // Patch Reservation State
+  const [isPatchReservationOpen, setIsPatchReservationOpen] = useState(false);
+
+  // UI States (Local only)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isFontModalOpen, setIsFontModalOpen] = useState(false);
+  const [isFontCatalogOpen, setIsFontCatalogOpen] = useState(false);
+  const [settingsFocusId, setSettingsFocusId] = useState<string | undefined>(
+    undefined,
+  );
+  const [gamePathModalState, setGamePathModalState] =
+    useState<GamePathModalState | null>(null);
+  const shownGamePathConflictKeysRef = useRef<Set<string>>(new Set());
+
+  const [bgImage, setBgImage] = useState(bgPoe);
+  const [bgOpacity, setBgOpacity] = useState(1);
+
+  // [New] Theme Settings Version to trigger Effects
+  const [themeVersion, setThemeVersion] = useState(0);
+
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false); // [UAC Migration]
+  const [isKakaoStarterUacModalOpen, setIsKakaoStarterUacModalOpen] =
+    useState(false);
+  const [kakaoStarterMigrationRequest, setKakaoStarterMigrationRequest] =
+    useState<KakaoGameStarterMigrationRequest | null>(null);
+  const [kakaoMaintenanceInfo, setKakaoMaintenanceInfo] =
+    useState<KakaoMaintenanceModalInfo | null>(null);
+  const [isFontMigrationOpen, setIsFontMigrationOpen] = useState(false);
+
+  // --- Global Game State ---
+  const { getActiveGameState, syncGameState } = useGameState();
+
+  // Computed: Current Active Status based on selection
+  const activeGameStatus = useMemo(() => {
+    return getActiveGameState(config.activeGame, config.serviceChannel);
+  }, [config.activeGame, config.serviceChannel, getActiveGameState]);
+  const isFontMigrationBlockedByRunningGame = useMemo(() => {
+    return (
+      getActiveGameState(config.activeGame, "Kakao Games").status ===
+        "running" ||
+      getActiveGameState(config.activeGame, "GGG").status === "running"
+    );
+  }, [config.activeGame, getActiveGameState]);
+
+  // Sync initial and switched state
+  useEffect(() => {
+    syncGameState(config.activeGame, config.serviceChannel);
+  }, [config.activeGame, config.serviceChannel, syncGameState]);
+
+  useEffect(() => {
+    if (!isFontMigrationOpen) return;
+    syncGameState(config.activeGame, "Kakao Games");
+    syncGameState(config.activeGame, "GGG");
+  }, [config.activeGame, isFontMigrationOpen, syncGameState]);
+
+  useEffect(() => {
+    if (!isConfigLoaded || !window.electronAPI || gamePathModalState) return;
+
+    const serviceId = config.serviceChannel;
+    const gameId = config.activeGame;
+    const contextKey = `${serviceId}:${gameId}`;
+    if (shownGamePathConflictKeysRef.current.has(contextKey)) return;
+
+    let canceled = false;
+    window.electronAPI
+      .getGameInstallPathDiagnostics(serviceId, gameId)
+      .then((diagnostics) => {
+        if (canceled) return;
+
+        const hasUsablePath =
+          diagnostics.config.verification === "valid" ||
+          diagnostics.registry.verification === "valid";
+        if (
+          !diagnostics.hasPathConflict ||
+          diagnostics.isPathConflictAcknowledged ||
+          !hasUsablePath
+        ) {
+          return;
+        }
+
+        shownGamePathConflictKeysRef.current.add(contextKey);
+        setGamePathModalState({
+          mode: "conflict",
+          serviceId,
+          gameId,
+          diagnostics,
+          busy: false,
+        });
+      })
+      .catch((error) => {
+        logger.warn(
+          `[App] Failed to check game path conflict: ${formatUnknownError(error)}`,
+        );
+      });
+
+    return () => {
+      canceled = true;
+    };
+  }, [
+    isConfigLoaded,
+    config.activeGame,
+    config.serviceChannel,
+    config.gameInstallPaths,
+    gamePathModalState,
+  ]);
+
+  // Active Status Message State
+  const [activeMessage, setActiveMessage] = useState<string>("");
+
+  const isFirstMount = useRef(true);
+
+  // Changelog State
+  const [changelogs, setChangelogs] = useState<ChangelogItem[]>([]);
+  const [versionRange, setVersionRange] = useState<{
+    old?: string;
+    new?: string;
+  }>({});
+  const [isChangelogOpen, setIsChangelogOpen] = useState(false);
+
+  // [New] Global Event Listener for Changelog
+  useEffect(() => {
+    const handleShowChangelogs = (event: Event) => {
+      const customEvent = event as CustomEvent<ChangelogItem[]>;
+      setChangelogs(customEvent.detail);
+      setVersionRange({}); // Clear version range for generic changelog display
+      setIsChangelogOpen(true);
+    };
+
+    window.addEventListener("SHOW_CHANGELOGS", handleShowChangelogs);
+    return () => {
+      window.removeEventListener("SHOW_CHANGELOGS", handleShowChangelogs);
+    };
+  }, []);
+  const prevStatusRef = useRef<RunStatus>("idle");
+
+  // Update State
+  // Update State (Using object for richer metadata)
+  const [updateState, setUpdateState] = useState<UpdateStatus>({
+    state: "idle",
+  });
+
+  // Changelog Listener
+  useEffect(() => {
+    if (window.electronAPI?.onShowChangelog) {
+      window.electronAPI.onShowChangelog((data) => {
+        // Handle both old (array only) and new (object) payload for safety
+        if (Array.isArray(data)) {
+          setChangelogs(data);
+          setVersionRange({});
+        } else {
+          setChangelogs(data.changelogs);
+          setVersionRange({ old: data.oldVersion, new: data.newVersion });
+        }
+        setIsChangelogOpen(true);
+      });
+    }
+
+    // [New] Event Listener for Font Manager
+    const handleOpenFontModal = () => setIsFontModalOpen(true);
+    window.addEventListener("open-font-manager-modal", handleOpenFontModal);
+
+    return () => {
+      window.removeEventListener(
+        "open-font-manager-modal",
+        handleOpenFontModal,
+      );
+    };
+  }, []);
+
+  // Forced Repair Modal State
+  const [isForcedRepairOpen, setIsForcedRepairOpen] = useState(false);
+  const [repairVersionInfo, setRepairVersionInfo] = useState<{
+    version: string;
+    webRoot: string;
+    timestamp: string | number;
+  } | null>(null);
+
+  // === Remote Version State ===
+  // Sources: main process RemoteVersionResolver (master socket -> gh-pages fallback),
+  // refreshed on window focus (10-min TTL). Renderer just listens.
+  const [remoteVersions, setRemoteVersions] = useState<RemoteVersions | null>(
+    null,
+  );
+
+  useEffect(() => {
+    const games: AppConfig["activeGame"][] = ["POE1", "POE2"];
+    const applyEntry = (entry: {
+      gameId: AppConfig["activeGame"];
+      webRoot: string;
+      version: string;
+      fetchedAt: number;
+    }) => {
+      setRemoteVersions((prev) => ({
+        ...(prev ?? {}),
+        [entry.gameId]: {
+          version: entry.version,
+          webRoot: entry.webRoot,
+          timestamp: entry.fetchedAt,
+        },
+      }));
+    };
+
+    // Initial resolve (uses cache if fresh, otherwise triggers fetch).
+    Promise.all(
+      games.map((gameId) => window.electronAPI.remoteVersion.resolve(gameId)),
+    ).then((results) => {
+      results.forEach((entry) => {
+        if (entry) applyEntry(entry);
+      });
+      logger.log("[App] Remote versions loaded:", results.filter(Boolean));
+    });
+
+    // Push updates when main refreshes the cache (e.g. window regains focus).
+    const unsubscribe = window.electronAPI.remoteVersion.onUpdated(
+      (payload) => {
+        applyEntry(payload);
+      },
+    );
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, []);
+
+  // Handle Manual Force Repair Request (from SupportLinks)
+  const handleForcedRepairRequest = useCallback(
+    (versionInfo: {
+      version: string;
+      webRoot: string;
+      timestamp: string | number;
+    }) => {
+      setRepairVersionInfo(versionInfo);
+      setIsForcedRepairOpen(true);
+    },
+    [],
+  );
+
+  const handleForcedRepairConfirm = useCallback(
+    (manualVersion: string) => {
+      setIsForcedRepairOpen(false);
+
+      // Try to get remote web root for this game to help main process
+      const remoteInfo = VersionService.getRemoteVersionForGame(
+        remoteVersions,
+        config.activeGame,
+      );
+
+      window.electronAPI.triggerForceRepair(
+        config.serviceChannel,
+        config.activeGame,
+        manualVersion,
+        remoteInfo?.webRoot,
+      );
+    },
+    [config.serviceChannel, config.activeGame, remoteVersions],
+  );
+
+  // [UAC Migration] Listener
+  useEffect(() => {
+    if (window.electronAPI) {
+      const cleanups: Array<() => void> = [];
+
+      if (window.electronAPI.onUacMigrationRequest) {
+        cleanups.push(
+          window.electronAPI.onUacMigrationRequest(() => {
+            setIsMigrationModalOpen(true);
+          }),
+        );
+      }
+
+      if (window.electronAPI.onKakaoStarterUacRequest) {
+        cleanups.push(
+          window.electronAPI.onKakaoStarterUacRequest(() => {
+            setIsKakaoStarterUacModalOpen(true);
+          }),
+        );
+      }
+
+      if (window.electronAPI.onKakaoStarterMigrationRequest) {
+        cleanups.push(
+          window.electronAPI.onKakaoStarterMigrationRequest((request) => {
+            setKakaoStarterMigrationRequest(request);
+          }),
+        );
+      }
+
+      if (window.electronAPI.onKakaoMaintenanceDetected) {
+        cleanups.push(
+          window.electronAPI.onKakaoMaintenanceDetected((info) => {
+            setKakaoMaintenanceInfo(info);
+          }),
+        );
+      }
+
+      // Signal to Main that Renderer is ready to receive UAC migration requests
+      window.electronAPI.reportUacMigrationReady();
+
+      return () => {
+        cleanups.forEach((cleanup) => cleanup());
+      };
+    }
+  }, []);
+
+  // [Font Migration] 부팅 시 구버전 변조 폰트 감지 → 안내
+  // 적용된 커스텀 폰트가 없으면 main에서 prompt=false 반환(스키마만 기록).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { prompt } = await window.electronAPI.font.checkMigration();
+        if (!cancelled && prompt) setIsFontMigrationOpen(true);
+      } catch {
+        // 실패 시 안내 생략 (다음 부팅에 재시도)
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleFontMigrationConfirm = async () => {
+    await window.electronAPI.font.completeMigration();
+    setIsFontMigrationOpen(false);
+  };
+
+  const handleMigrationConfirm = () => {
+    window.electronAPI?.confirmUacMigration();
+    setIsMigrationModalOpen(false);
+  };
+
+  const handleMigrationCancel = () => {
+    setIsMigrationModalOpen(false);
+  };
+
+  const handleKakaoStarterUacConfirm = async () => {
+    const success =
+      (await window.electronAPI?.confirmKakaoStarterUacBypass()) === true;
+    if (success) {
+      setIsKakaoStarterUacModalOpen(false);
+    }
+    return success;
+  };
+
+  const handleKakaoStarterUacDecline = async () => {
+    await window.electronAPI?.declineKakaoStarterUacBypass();
+    setIsKakaoStarterUacModalOpen(false);
+  };
+
+  const handleOpenKakaoStarterInstaller = async () => {
+    return (
+      (await window.electronAPI?.openKakaoGamesStarterInstaller()) === true
+    );
+  };
+
+  const handleUninstallDaumGameStarter = async () => {
+    return (await window.electronAPI?.uninstallDaumGameStarter()) === true;
+  };
+
+  const handleCloseKakaoStarterMigration = () => {
+    setKakaoStarterMigrationRequest(null);
+    void window.electronAPI?.dismissKakaoStarterMigrationPrompt();
+  };
+
+  // Launcher Title State (Managed by Main Process via Events)
+  const [appTitle, setAppTitle] = useState<string | undefined>(undefined);
+  const [isTopCenterTitlebarHovered, setIsTopCenterTitlebarHovered] =
+    useState(false);
+
+  useEffect(() => {
+    if (window.electronAPI?.onTitleUpdated) {
+      const cleanup = window.electronAPI.onTitleUpdated((newTitle) => {
+        setAppTitle(newTitle);
+      });
+      window.electronAPI.requestTitleUpdate();
+      return cleanup;
+    }
+  }, []);
+
+  useEffect(() => {
+    return window.electronAPI?.onTopCenterTitlebarHover?.(
+      setIsTopCenterTitlebarHovered,
+    );
+  }, []);
+
+  // Patch Modal State
+  const [patchModalState, setPatchModalState] = useState<{
+    isOpen: boolean;
+    mode: "confirm" | "progress" | "done" | "error";
+    gameId?: string;
+    serviceId?: string;
+    progress?: PatchProgress;
+    autoStart?: boolean;
+  }>({
+    isOpen: false,
+    mode: "confirm",
+  });
+
+  // Patch Progress Listener
+  useEffect(() => {
+    if (window.electronAPI) {
+      if (window.electronAPI.onPatchProgress) {
+        window.electronAPI.onPatchProgress((progress: PatchProgress) => {
+          const isDone = progress.status === "done";
+          if (isDone) {
+            setActiveMessage(
+              "패치 복구가 완료되었습니다. 이제 게임을 실행할 수 있습니다.",
+            );
+            // Auto-clear after 5 seconds
+            setTimeout(() => setActiveMessage(""), 5000);
+          }
+
+          setPatchModalState((prev) => ({
+            ...prev,
+            mode: isDone
+              ? "done"
+              : progress.status === "error"
+                ? "error"
+                : "progress",
+            isOpen: true,
+            progress,
+          }));
+        });
+      }
+
+      // Listener for showing modal (from AutoPatchHandler or Manual trigger)
+      if (window.electronAPI.onShowPatchFixModal) {
+        window.electronAPI.onShowPatchFixModal(
+          (data: {
+            autoStart: boolean;
+            serviceId?: string;
+            gameId?: string;
+          }) => {
+            // data: { autoStart: boolean, serviceId?: string, gameId?: string }
+            const isAuto = data.autoStart;
+            setPatchModalState((prev) => ({
+              ...prev,
+              isOpen: true,
+              mode: isAuto ? "progress" : "confirm",
+              autoStart: isAuto,
+              serviceId: data.serviceId,
+              gameId: data.gameId,
+            }));
+          },
+        );
+      }
+
+      // [New] Listener for Patch Reservation Modal
+      if (window.electronAPI.onShowPatchReservationModal) {
+        window.electronAPI.onShowPatchReservationModal(() => {
+          setIsPatchReservationOpen(true);
+        });
+      }
+    }
+  }, []);
+
+  const handlePatchConfirm = useCallback(() => {
+    // Trigger Manual Fix execution via Main IPC
+    window.electronAPI.triggerManualPatchFix();
+    setPatchModalState((prev) => ({
+      ...prev,
+      mode: "progress",
+      progress: {
+        status: "waiting",
+        overallProgress: 0,
+        total: 0,
+        current: 0,
+        files: [],
+      },
+    }));
+  }, []);
+
+  const handlePatchCancel = useCallback(() => {
+    // We need to check the *current* state mode.
+    // Since this callback depends on patchModalState.mode, it will update when mode changes.
+    // However, onCancel is NOT a dependency of the auto-close effect in PatchFixModal, so this is safe.
+    setPatchModalState((prev) => {
+      if (prev.mode === "progress") {
+        window.electronAPI.triggerPatchCancel();
+      }
+      return { ...prev, isOpen: false };
+    });
+  }, []);
+
+  const handlePatchClose = useCallback(() => {
+    setPatchModalState((prev) => ({ ...prev, isOpen: false }));
+  }, []);
+
+  const refreshTheme = useCallback(async () => {
+    if (!window.electronAPI) return;
+
+    // Fetch both themes once to avoid redundant IPC calls
+    const [t1, t2] = await Promise.all([
+      window.electronAPI.getActiveTheme("POE1"),
+      window.electronAPI.getActiveTheme("POE2"),
+    ]);
+
+    setPoe1Theme(t1);
+    setPoe2Theme(t2);
+  }, []);
+
+  // Update Check Effect
+  useEffect(() => {
+    if (window.electronAPI) {
+      // Listen for update status
+      const unsubscribe = window.electronAPI.onUpdateStatusChange((status) => {
+        logger.log("[App] Update status:", status);
+        setUpdateState(status);
+
+        if (status.state === "available" && !status.isSilent) {
+          setIsUpdateModalOpen(true);
+        }
+      });
+
+      // Trigger check
+      window.electronAPI.checkForUpdates();
+
+      // [New] Listen for theme settings changes to refresh
+      const unsubConfig = window.electronAPI.onConfigChange((key) => {
+        if (
+          key === CONFIG_KEYS.REMOTE_THEME_SETTINGS ||
+          key === CONFIG_KEYS.ACTIVE_GAME
+        ) {
+          refreshTheme();
+        }
+      });
+
+      // Listen for initial theme cache sync
+      const unsubThemeSync = window.electronAPI.onThemeSynced(() => {
+        logger.log("[App] Theme cache synced. Refreshing UI.");
+        refreshTheme();
+      });
+
+      return () => {
+        unsubscribe();
+        unsubConfig();
+        unsubThemeSync();
+      };
+    }
+  }, [refreshTheme]);
+
+  useEffect(() => {
+    const initTheme = async () => {
+      await refreshTheme();
+    };
+    initTheme();
+  }, [refreshTheme]);
+
+  const handleUpdateClick = () => {
+    window.electronAPI.downloadUpdate();
+    // Modal stays open to show progress
+  };
+
+  const handleInstallClick = (isSilent = true) => {
+    window.electronAPI.installUpdate(isSilent);
+  };
+
+  const handleUpdateDismiss = () => {
+    setIsUpdateModalOpen(false);
+  };
+
+  const closeSettings = () => {
+    setIsSettingsOpen(false);
+    setSettingsFocusId(undefined);
+  };
+
+  const openSettingsWithFocus = (configId: string) => {
+    setSettingsFocusId(configId);
+    setIsSettingsOpen(true);
+  };
+
+  // Effect: Handle Generic Status Message & Timers
+  useEffect(() => {
+    const status = activeGameStatus.status;
+    const prevStatus = prevStatusRef.current;
+
+    // Ignore initial mount idle state (don't show "Game Exited" on boot)
+    if (status === "idle" && prevStatus === "idle") {
+      return;
+    }
+
+    // Also ignore transition from "uninstalled" to "idle" (re-install or config switch)
+    // BUT we must CLEAR the sticky "uninstalled" message!
+    if (
+      status === "idle" &&
+      (prevStatus === "uninstalled" || prevStatus === "install_check_blocked")
+    ) {
+      setTimeout(() => setActiveMessage(""), 0);
+      prevStatusRef.current = status;
+      return;
+    }
+
+    prevStatusRef.current = status;
+
+    const config = STATUS_MESSAGES[status];
+    if (!config) return;
+
+    let messageText = config.message;
+
+    // Special Case: Error Code Overrides
+    if (status === "error" && activeGameStatus.errorCode) {
+      messageText = `오류: ${activeGameStatus.errorCode}`;
+    }
+
+    // Set Message (Async to avoid synchronous setState warning)
+    setTimeout(() => setActiveMessage(messageText), 0);
+
+    // clear previous timers handled by useEffect cleanup
+
+    // If timeout is defined and positive, set auto-clear
+    if (config.timeout > 0) {
+      const timer = setTimeout(() => {
+        setActiveMessage("");
+      }, config.timeout);
+      return () => clearTimeout(timer);
+    }
+  }, [activeGameStatus.status, activeGameStatus.errorCode]);
+
+  // Compute Active Status Message (Context Aware)
+  const activeStatusMessage = useMemo(() => {
+    // Only show status if it matches the currently selected Game & Service context
+    if (
+      activeGameStatus.gameId === config.activeGame &&
+      activeGameStatus.serviceId === config.serviceChannel
+    ) {
+      return activeMessage;
+    }
+  }, [
+    activeGameStatus.gameId,
+    activeGameStatus.serviceId,
+    config.activeGame,
+    config.serviceChannel,
+    activeMessage,
+  ]);
+
+  const shouldShowGamePathManualPrompt = useMemo(() => {
+    if (
+      activeGameStatus.gameId !== config.activeGame ||
+      activeGameStatus.serviceId !== config.serviceChannel
+    ) {
+      return false;
+    }
+
+    return (
+      activeGameStatus.status === "uninstalled" ||
+      activeGameStatus.status === "install_check_blocked"
+    );
+  }, [
+    activeGameStatus.gameId,
+    activeGameStatus.serviceId,
+    activeGameStatus.status,
+    config.activeGame,
+    config.serviceChannel,
+  ]);
+
+  // Compute Button Disabled State
+  const isButtonDisabled = useMemo(() => {
+    // Context mismatch check
+    if (
+      activeGameStatus.gameId !== config.activeGame ||
+      activeGameStatus.serviceId !== config.serviceChannel
+    ) {
+      return false; // Actually, if context mismatch, we might want to allow "Starting" new context?
+      // But adhering to original logic:
+      return false;
+    }
+
+    const s = activeGameStatus.status;
+
+    // ACTIVE: "Install" button should be ENABLED (not disabled)
+    // allowing user to click and go to download page.
+    if (s === "uninstalled") return false;
+    if (s === "install_check_blocked") return false;
+
+    // Running states -> Disabled
+    if (
+      s === "preparing" ||
+      s === "processing" ||
+      s === "authenticating" ||
+      s === "ready" ||
+      s === "running"
+    ) {
+      return true;
+    }
+
+    // Idle / Error -> Enabled
+    return false;
+  }, [activeGameStatus, config.activeGame, config.serviceChannel]);
+
+  // Whether the install needs patching: local last-seen version differs from remote latest.
+  // Only meaningful when game is installed and we have both versions.
+  const isUpdateNeeded = useMemo(() => {
+    if (
+      activeGameStatus.status === "uninstalled" ||
+      activeGameStatus.status === "install_check_blocked"
+    ) {
+      return false;
+    }
+    const key = `${config.activeGame}_${config.serviceChannel}`;
+    const localVersion = config.knownGameVersions?.[key]?.version;
+    const remoteVersion = remoteVersions?.[config.activeGame]?.version;
+    if (!localVersion || !remoteVersion) return false;
+    if (localVersion === "unknown" || remoteVersion === "unknown") return false;
+    return VersionService.compareVersions(remoteVersion, localVersion) > 0;
+  }, [
+    activeGameStatus.status,
+    config.activeGame,
+    config.serviceChannel,
+    config.knownGameVersions,
+    remoteVersions,
+  ]);
+
+  const gameStartButtonLabel = useMemo(
+    () => getGameStartButtonLabel(activeGameStatus.status, isUpdateNeeded),
+    [activeGameStatus.status, isUpdateNeeded],
+  );
+
+  useEffect(() => {
+    if (window.electronAPI) {
+      // 1. Initial Load
+      // 1. Initial Load
+      window.electronAPI.getConfig().then((rawConfig: unknown) => {
+        const loadedConfig = rawConfig as AppConfig;
+        setConfigState(loadedConfig);
+        setIsConfigLoaded(true);
+
+        // [Flicker Fix] Use cached background path immediately if available to avoid default assets flicker.
+        const cachedPath =
+          loadedConfig.themeCache?.[loadedConfig.activeGame]?.assetPath;
+        const initialBg =
+          cachedPath || (loadedConfig.activeGame === "POE2" ? bgPoe2 : bgPoe);
+        setBgImage(initialBg);
+      });
+
+      // 2. Listen for Changes (Reactive Observer)
+      window.electronAPI.onConfigChange((key, value) => {
+        setConfigState((prev) => ({
+          ...prev,
+          [key]: value,
+        }));
+        if (key === CONFIG_KEYS.REMOTE_THEME_SETTINGS) {
+          setThemeVersion((prev) => prev + 1);
+        }
+      });
+    }
+  }, []);
+
+  // Effect 1: Theme Application (Single Source of Truth)
+  // Re-applies CSS variables whenever the cache for the active game changes.
+  useEffect(() => {
+    if (!isConfigLoaded) return;
+
+    const cached = config.themeCache[config.activeGame];
+    if (cached) {
+      applyThemeColors(cached);
+    } else {
+      applyThemeColors(DEFAULT_THEME_COLORS);
+    }
+  }, [activeTheme, isConfigLoaded, config.activeGame, config.themeCache]);
+
+  // Effect 2a: Sync Theme Data from Main (Only on app start or settings change)
+  useEffect(() => {
+    const syncThemes = async () => {
+      if (!window.electronAPI || !isConfigLoaded) return;
+      try {
+        const [p1Theme, p2Theme] = await Promise.all([
+          window.electronAPI.getActiveTheme("POE1"),
+          window.electronAPI.getActiveTheme("POE2"),
+        ]);
+        setPoe1Theme(p1Theme);
+        setPoe2Theme(p2Theme);
+        setIsThemesSynced(true);
+        logger.log("[Theme] Theme definitions synced from main process.");
+      } catch (err) {
+        logger.error("[Theme] Failed to sync themes:", err);
+      }
+    };
+    syncThemes();
+  }, [isConfigLoaded, themeVersion]);
+
+  // [Splash] Remove launcher splash screen ONLY after initial theme sync is complete
+  useEffect(() => {
+    if (isThemesSynced) {
+      const splash = document.getElementById("launcher-splash");
+      if (splash) {
+        // [Optimization] Small delay to ensure the first themed frame is rendered
+        const timer = setTimeout(() => {
+          splash.classList.add("fade-out");
+          setTimeout(() => splash.remove(), 1000);
+          logger.log("[Splash] Theme synced. Splash screen removed.");
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isThemesSynced]);
+
+  // Effect 2c: Trigger Theme Revalidation Event
+  // Only triggered when the actual background definition (path) changes.
+  useEffect(() => {
+    // [Fix] Wait for the initial theme sync to finish before triggering revalidation.
+    // This prevents re-extracting from default assets while remote themes are still loading.
+    if (!isConfigLoaded || !isThemesSynced) return;
+
+    const poe1Bg = (poe1Theme && poe1Theme.assets?.background) || bgPoe;
+    const poe2Bg = (poe2Theme && poe2Theme.assets?.background) || bgPoe2;
+
+    const dispatchRevalidate = (game: "POE1" | "POE2", assetPath: string) => {
+      window.dispatchEvent(
+        new CustomEvent("REVALIDATE_THEME_COLORS", {
+          detail: { game, assetPath },
+        }),
+      );
+    };
+
+    // Initial load: revalidate both to ensure cache is fresh
+    if (isFirstMount.current) {
+      dispatchRevalidate("POE1", poe1Bg);
+      dispatchRevalidate("POE2", poe2Bg);
+    }
+
+    // Background change detection:
+    // This effect runs whenever poe1Theme or poe2Theme changes (e.g. from Remote or Settings).
+    if (config.activeGame === "POE1") {
+      dispatchRevalidate("POE1", poe1Bg);
+    } else {
+      dispatchRevalidate("POE2", poe2Bg);
+    }
+  }, [isConfigLoaded, isThemesSynced, poe1Theme, poe2Theme, config.activeGame]);
+
+  // [New] Refs to manage background transitions without double-flicker
+  const pendingTargetRef = useRef<string | null>(null);
+  const fadeTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Effect 3: Background Transition Visuals (Flicker-Free & Guaranteed Fade)
+  useEffect(() => {
+    // [Flicker Fix] If themes aren't synced yet, prefer the cached path to avoid resetting to default background.
+    // This aligns targetBg with the actual colors stored in themeCache (Single Source of Truth).
+    const cachedPath = config.themeCache?.[config.activeGame]?.assetPath;
+    const targetBg = isThemesSynced
+      ? (activeTheme && activeTheme.assets?.background) ||
+        (config.activeGame === "POE1" ? bgPoe : bgPoe2)
+      : cachedPath || (config.activeGame === "POE1" ? bgPoe : bgPoe2);
+
+    // Initial mount: set immediately without animation (Deferred to avoid sync setState)
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      const timer = setTimeout(() => {
+        setBgImage(targetBg);
+        setBgOpacity(1);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+
+    // Update the intended final target
+    pendingTargetRef.current = targetBg;
+
+    // If a transition is ALREADY in progress, just stop here.
+    // The current timer will pick up the latest target from pendingTargetRef when it fires.
+    if (fadeTimerRef.current) return;
+
+    // --- Start a new transition sequence ---
+    // Use setTimeout to avoid synchronous setState inside effect
+    const startTimer = setTimeout(() => {
+      setBgOpacity(0);
+    }, 0);
+
+    fadeTimerRef.current = setTimeout(() => {
+      // 1. Swap the image while it's dark (opacity 0)
+      const finalTarget = pendingTargetRef.current || targetBg;
+      setBgImage(finalTarget);
+
+      // 2. [Reliability Fix] Small delay to ensure browser processed the image swap before fading in
+      // This avoids the image appearing to 'snap' or skip the fade animation in some cases.
+      setTimeout(() => {
+        setBgOpacity(1);
+        fadeTimerRef.current = null;
+      }, 50);
+    }, 400);
+
+    return () => {
+      clearTimeout(startTimer);
+      // Note: We don't clear the main fadeTimerRef here (unless we want to restart on every update).
+      // If we don't clear, we get a single smooth dark period even with rapid updates.
+    };
+  }, [
+    isConfigLoaded,
+    isThemesSynced,
+    activeTheme,
+    config.activeGame,
+    config.themeCache,
+  ]);
+
+  const handleGameChange = (game: AppConfig["activeGame"]) => {
+    // 1. User triggered change moves the "Source of Truth"
+    window.electronAPI?.setConfig(CONFIG_KEYS.ACTIVE_GAME, game);
+  };
+
+  const handleChannelChange = (channel: AppConfig["serviceChannel"]) => {
+    // 2. User triggered change moves the "Source of Truth"
+    window.electronAPI?.setConfig(CONFIG_KEYS.SERVICE_CHANNEL, channel);
+  };
+
+  const openDownloadPage = useCallback(
+    async (
+      serviceId: AppConfig["serviceChannel"],
+      gameId: AppConfig["activeGame"],
+    ) => {
+      // [SteamDeck] 웹 다운로드 페이지 대신 런처가 공식 설치 프로그램을 직접
+      // 받아 실행한다. 브라우저로 받으면 (특히 스팀덱에서) 런처가 접근할 수
+      // 없는 위치에 설치되기 쉽다. 실패하면 기존처럼 다운로드 페이지를 연다.
+      try {
+        const result = await window.electronAPI?.runGameSetupInstaller?.(
+          serviceId,
+          gameId,
+        );
+        if (result?.ok) {
+          logger.log(
+            `[App] Official setup launched in-launcher for ${gameId} / ${serviceId}`,
+          );
+          return;
+        }
+        if (result?.error) {
+          logger.warn(`[App] In-launcher setup failed: ${result.error}`);
+        }
+      } catch (error) {
+        logger.warn(`[App] In-launcher setup threw: ${String(error)}`);
+      }
+
+      const downloadUrl = DOWNLOAD_URLS[serviceId][gameId];
+      if (downloadUrl) {
+        window.open(downloadUrl, "_blank");
+        return;
+      }
+
+      logger.error(`[App] No download URL found for ${gameId} / ${serviceId}`);
+    },
+    [],
+  );
+
+  const openGamePathModal = useCallback(
+    async (
+      mode: GamePathModalMode,
+      serviceId: AppConfig["serviceChannel"],
+      gameId: AppConfig["activeGame"],
+      options?: { highlightManual?: boolean },
+    ) => {
+      if (!window.electronAPI) {
+        logger.warn("Electron API not available");
+        return;
+      }
+
+      setGamePathModalState({
+        mode,
+        serviceId,
+        gameId,
+        diagnostics: null,
+        busy: true,
+        highlightManual: options?.highlightManual ?? false,
+        showRegistrySyncConfirm: false,
+        showRegistryClearConfirm: false,
+      });
+
+      try {
+        const diagnostics =
+          await window.electronAPI.getGameInstallPathDiagnostics(
+            serviceId,
+            gameId,
+          );
+
+        setGamePathModalState((current) => {
+          if (
+            !current ||
+            current.mode !== mode ||
+            current.serviceId !== serviceId ||
+            current.gameId !== gameId
+          ) {
+            return current;
+          }
+
+          return {
+            ...current,
+            diagnostics,
+            busy: false,
+            errorMessage: undefined,
+          };
+        });
+      } catch (error) {
+        setGamePathModalState((current) => {
+          if (!current) return current;
+
+          return {
+            ...current,
+            busy: false,
+            errorMessage: `게임 경로를 확인하지 못했습니다. ${formatUnknownError(error)}`,
+          };
+        });
+      }
+    },
+    [],
+  );
+
+  const handleGamePathContextChange = useCallback(
+    async (
+      serviceId: AppConfig["serviceChannel"],
+      gameId: AppConfig["activeGame"],
+    ) => {
+      if (!window.electronAPI || !gamePathModalState) {
+        return;
+      }
+
+      if (
+        gamePathModalState.serviceId === serviceId &&
+        gamePathModalState.gameId === gameId
+      ) {
+        return;
+      }
+
+      setGamePathModalState((current) =>
+        current
+          ? {
+              ...current,
+              mode: "diagnostic",
+              serviceId,
+              gameId,
+              diagnostics: null,
+              busy: true,
+              errorMessage: undefined,
+              highlightManual: false,
+              showRegistrySyncConfirm: false,
+              showRegistryClearConfirm: false,
+            }
+          : current,
+      );
+
+      try {
+        const diagnostics =
+          await window.electronAPI.getGameInstallPathDiagnostics(
+            serviceId,
+            gameId,
+          );
+
+        setGamePathModalState((current) => {
+          if (
+            !current ||
+            current.serviceId !== serviceId ||
+            current.gameId !== gameId
+          ) {
+            return current;
+          }
+
+          return {
+            ...current,
+            diagnostics,
+            busy: false,
+          };
+        });
+      } catch (error) {
+        setGamePathModalState((current) => {
+          if (
+            !current ||
+            current.serviceId !== serviceId ||
+            current.gameId !== gameId
+          ) {
+            return current;
+          }
+
+          return {
+            ...current,
+            busy: false,
+            errorMessage: `게임 경로를 확인하지 못했습니다. ${formatUnknownError(error)}`,
+          };
+        });
+      }
+    },
+    [gamePathModalState],
+  );
+
+  const handleGamePathModalClose = useCallback(() => {
+    setGamePathModalState(null);
+  }, []);
+
+  const handleUseGamePath = useCallback(
+    async (source: GamePathSource) => {
+      if (!window.electronAPI || !gamePathModalState?.diagnostics) return;
+
+      const { serviceId, gameId, diagnostics } = gamePathModalState;
+      const installPath = diagnostics[source].path;
+      if (!installPath) {
+        setGamePathModalState((current) =>
+          current
+            ? {
+                ...current,
+                errorMessage: "저장할 경로가 없습니다.",
+              }
+            : current,
+        );
+        return;
+      }
+
+      if (
+        source === "config" &&
+        diagnostics.hasPathConflict &&
+        diagnostics.registry.path
+      ) {
+        setGamePathModalState((current) =>
+          current
+            ? {
+                ...current,
+                showRegistrySyncConfirm: true,
+                showRegistryClearConfirm: false,
+                errorMessage: undefined,
+              }
+            : current,
+        );
+        return;
+      }
+
+      setGamePathModalState((current) =>
+        current ? { ...current, busy: true, errorMessage: undefined } : current,
+      );
+
+      try {
+        const result = await window.electronAPI.setGameInstallPath(
+          serviceId,
+          gameId,
+          installPath,
+        );
+
+        if (result.ok) {
+          setGamePathModalState(null);
+          void syncGameState(gameId, serviceId);
+          return;
+        }
+
+        setGamePathModalState((current) =>
+          current
+            ? {
+                ...current,
+                diagnostics: result.diagnostics || current.diagnostics,
+                busy: false,
+                errorMessage: getGamePathSaveErrorMessage(
+                  result.verification,
+                  result.error,
+                ),
+              }
+            : current,
+        );
+      } catch (error) {
+        setGamePathModalState((current) =>
+          current
+            ? {
+                ...current,
+                busy: false,
+                errorMessage: `게임 경로를 저장하지 못했습니다. ${formatUnknownError(error)}`,
+              }
+            : current,
+        );
+      }
+    },
+    [gamePathModalState, syncGameState],
+  );
+
+  const handleManualGamePathSelect = useCallback(async () => {
+    if (!window.electronAPI || !gamePathModalState) return;
+
+    const { serviceId, gameId } = gamePathModalState;
+    setGamePathModalState((current) =>
+      current ? { ...current, busy: true, errorMessage: undefined } : current,
+    );
+
+    try {
+      const result = await window.electronAPI.pickGameInstallPath(
+        serviceId,
+        gameId,
+      );
+
+      if (result.ok) {
+        setGamePathModalState((current) =>
+          current
+            ? {
+                ...current,
+                mode: "diagnostic",
+                diagnostics: result.diagnostics,
+                busy: false,
+                errorMessage: undefined,
+                highlightManual: false,
+                showRegistrySyncConfirm: false,
+                showRegistryClearConfirm: false,
+                manualSaveToastId: Date.now(),
+              }
+            : current,
+        );
+
+        void syncGameState(gameId, serviceId);
+        return;
+      }
+
+      setGamePathModalState((current) =>
+        current
+          ? {
+              ...current,
+              diagnostics: result.diagnostics || current.diagnostics,
+              busy: false,
+              errorMessage: result.canceled
+                ? undefined
+                : getGamePathSaveErrorMessage(
+                    result.verification,
+                    result.error,
+                  ),
+            }
+          : current,
+      );
+    } catch (error) {
+      setGamePathModalState((current) =>
+        current
+          ? {
+              ...current,
+              busy: false,
+              errorMessage: `수동 경로를 저장하지 못했습니다. ${formatUnknownError(error)}`,
+            }
+          : current,
+      );
+    }
+  }, [gamePathModalState, syncGameState]);
+
+  const handleGamePathConflictConfirmClose = useCallback(() => {
+    setGamePathModalState((current) =>
+      current ? { ...current, showRegistrySyncConfirm: false } : current,
+    );
+  }, []);
+
+  const handleGamePathRegistryClearConfirmClose = useCallback(() => {
+    setGamePathModalState((current) =>
+      current ? { ...current, showRegistryClearConfirm: false } : current,
+    );
+  }, []);
+
+  const handleClearGamePath = useCallback(
+    async (source: GamePathSource, confirmed = false) => {
+      if (!window.electronAPI || !gamePathModalState) return;
+
+      if (source === "registry" && !confirmed) {
+        setGamePathModalState((current) =>
+          current
+            ? {
+                ...current,
+                showRegistryClearConfirm: true,
+                showRegistrySyncConfirm: false,
+                errorMessage: undefined,
+              }
+            : current,
+        );
+        return;
+      }
+
+      const { serviceId, gameId } = gamePathModalState;
+      setGamePathModalState((current) =>
+        current
+          ? {
+              ...current,
+              busy: true,
+              errorMessage: undefined,
+              showRegistryClearConfirm: false,
+            }
+          : current,
+      );
+
+      try {
+        const result = await window.electronAPI.clearGameInstallPath(
+          serviceId,
+          gameId,
+          source,
+        );
+
+        if (result.ok) {
+          setGamePathModalState((current) =>
+            current
+              ? {
+                  ...current,
+                  mode: "diagnostic",
+                  diagnostics: result.diagnostics,
+                  busy: false,
+                  errorMessage: undefined,
+                  showRegistrySyncConfirm: false,
+                  showRegistryClearConfirm: false,
+                }
+              : current,
+          );
+          void syncGameState(gameId, serviceId);
+          return;
+        }
+
+        setGamePathModalState((current) =>
+          current
+            ? {
+                ...current,
+                diagnostics: result.diagnostics || current.diagnostics,
+                busy: false,
+                errorMessage:
+                  result.error ||
+                  (source === "registry"
+                    ? "레지스트리 설치 경로를 삭제하지 못했습니다."
+                    : "저장된 게임 경로를 삭제하지 못했습니다."),
+              }
+            : current,
+        );
+      } catch (error) {
+        setGamePathModalState((current) =>
+          current
+            ? {
+                ...current,
+                busy: false,
+                errorMessage: `게임 경로를 삭제하지 못했습니다. ${formatUnknownError(error)}`,
+              }
+            : current,
+        );
+      }
+    },
+    [gamePathModalState, syncGameState],
+  );
+
+  const handleResolveGamePathConflict = useCallback(
+    async (action: "launcher-config-only" | "sync-registry") => {
+      if (!window.electronAPI || !gamePathModalState) return;
+
+      const { serviceId, gameId } = gamePathModalState;
+      setGamePathModalState((current) =>
+        current
+          ? {
+              ...current,
+              busy: true,
+              errorMessage: undefined,
+              showRegistrySyncConfirm: false,
+              showRegistryClearConfirm: false,
+            }
+          : current,
+      );
+
+      try {
+        const result = await window.electronAPI.resolveGameInstallPathConflict(
+          serviceId,
+          gameId,
+          action,
+        );
+
+        if (result.ok) {
+          setGamePathModalState(null);
+          void syncGameState(gameId, serviceId);
+          return;
+        }
+
+        setGamePathModalState((current) =>
+          current
+            ? {
+                ...current,
+                diagnostics: result.diagnostics || current.diagnostics,
+                busy: false,
+                errorMessage:
+                  result.verification === "valid" &&
+                  result.action === "sync-registry"
+                    ? "레지스트리 설치 경로를 업데이트하지 못했습니다."
+                    : result.verification === "valid" &&
+                        result.action === "launcher-config-only"
+                      ? "경로 충돌 확인 상태를 저장하지 못했습니다."
+                      : getGamePathSaveErrorMessage(
+                          result.verification,
+                          result.error,
+                        ),
+              }
+            : current,
+        );
+      } catch (error) {
+        setGamePathModalState((current) =>
+          current
+            ? {
+                ...current,
+                busy: false,
+                errorMessage: `게임 경로 충돌을 처리하지 못했습니다. ${formatUnknownError(error)}`,
+              }
+            : current,
+        );
+      }
+    },
+    [gamePathModalState, syncGameState],
+  );
+
+  const handleGamePathInstall = useCallback(() => {
+    if (!gamePathModalState) return;
+
+    void openDownloadPage(
+      gamePathModalState.serviceId,
+      gamePathModalState.gameId,
+    );
+    setGamePathModalState(null);
+  }, [gamePathModalState, openDownloadPage]);
+
+  useEffect(() => {
+    const handleOpenGamePathModal = () => {
+      void openGamePathModal(
+        "diagnostic",
+        config.serviceChannel,
+        config.activeGame,
+      );
+    };
+
+    window.addEventListener(
+      "open-game-path-diagnostic-modal",
+      handleOpenGamePathModal,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "open-game-path-diagnostic-modal",
+        handleOpenGamePathModal,
+      );
+    };
+  }, [config.activeGame, config.serviceChannel, openGamePathModal]);
+
+  const handleGameStart = () => {
+    if (!window.electronAPI) {
+      logger.warn("Electron API not available");
+      return;
+    }
+
+    if (activeGameStatus.status === "uninstalled") {
+      void openGamePathModal(
+        "missing",
+        config.serviceChannel,
+        config.activeGame,
+      );
+      return;
+    }
+
+    if (activeGameStatus.status === "install_check_blocked") {
+      void openGamePathModal(
+        "missing",
+        config.serviceChannel,
+        config.activeGame,
+      );
+      return;
+    }
+
+    window.electronAPI.triggerGameStart({
+      gameId: config.activeGame,
+      serviceId: config.serviceChannel,
+    });
+    logger.log(`Game Start Triggered via IPC (${config.activeGame})`);
+  };
+
+  // Developer Notices State
+  const [devNotices, setDevNotices] = useState<NewsItem[]>([]);
+  const [newsLastUpdatedAt, setNewsLastUpdatedAt] = useState<number | null>(
+    null,
+  );
+  const [isNewsRefreshing, setIsNewsRefreshing] = useState(false);
+  const [selectedNotice, setSelectedNotice] = useState<NewsItem | null>(null);
+
+  const handleNoticeClick = useCallback((item: NewsItem) => {
+    setSelectedNotice(item);
+  }, []);
+
+  const handleNewsOpenModeChange = useCallback((mode: NewsOpenMode) => {
+    setConfigState((prev) => ({
+      ...prev,
+      newsOpenMode: mode,
+    }));
+    void window.electronAPI?.setConfig(CONFIG_KEYS.NEWS_OPEN_MODE, mode);
+  }, []);
+
+  const loadDevNotices = useCallback(async (live = false) => {
+    if (!window.electronAPI) return [];
+
+    const cached = await window.electronAPI.getNewsCache(
+      DEV_NOTICE_SOURCE.game,
+      DEV_NOTICE_SOURCE.service,
+      DEV_NOTICE_SOURCE.category,
+    );
+
+    if (!live) {
+      return cached;
+    }
+
+    return window.electronAPI.getNews(
+      DEV_NOTICE_SOURCE.game,
+      DEV_NOTICE_SOURCE.service,
+      DEV_NOTICE_SOURCE.category,
+    );
+  }, []);
+
+  const loadNewsLastUpdatedAt = useCallback(async () => {
+    if (!window.electronAPI) return null;
+
+    const timestamps = await Promise.all(
+      NEWS_REFRESH_SOURCES.map((source) =>
+        window.electronAPI.getNewsLastUpdatedAt(
+          source.game,
+          source.service,
+          source.category,
+        ),
+      ),
+    );
+    const validTimestamps = timestamps.filter(
+      (timestamp): timestamp is number => typeof timestamp === "number",
+    );
+
+    return validTimestamps.length > 0 ? Math.max(...validTimestamps) : null;
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const load = async (live = false) => {
+      const cached = await loadDevNotices(false);
+      const cachedLastUpdatedAt = await loadNewsLastUpdatedAt();
+      if (!isMounted) return;
+      setDevNotices(cached);
+      setNewsLastUpdatedAt(cachedLastUpdatedAt);
+
+      if (live) {
+        const latest = await loadDevNotices(true);
+        const latestLastUpdatedAt = await loadNewsLastUpdatedAt();
+        if (!isMounted) return;
+        setDevNotices(latest);
+        setNewsLastUpdatedAt(latestLastUpdatedAt);
+      }
+    };
+
+    load(true);
+
+    const unsubscribe = window.electronAPI?.onNewsUpdated(() => {
+      load(false);
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe?.();
+    };
+  }, [loadDevNotices, loadNewsLastUpdatedAt]);
+
+  const handleManualNewsRefresh = useCallback(async () => {
+    if (!window.electronAPI || isNewsRefreshing) return;
+
+    setIsNewsRefreshing(true);
+    try {
+      await window.electronAPI.refreshAllNews();
+      const latest = await loadDevNotices(false);
+      const lastUpdatedAt = await loadNewsLastUpdatedAt();
+      setDevNotices(latest);
+      setNewsLastUpdatedAt(lastUpdatedAt);
+    } catch (error) {
+      logger.error("Failed to refresh news sections:", error);
+    } finally {
+      setIsNewsRefreshing(false);
+    }
+  }, [isNewsRefreshing, loadDevNotices, loadNewsLastUpdatedAt]);
+
+  const handleDevRead = (id: string) => {
+    window.electronAPI.markNewsAsRead(id);
+    setDevNotices((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, isNew: false } : item)),
+    );
+  };
+
+  const handleOnboardingFinish = () => {
+    window.electronAPI?.setConfig(CONFIG_KEYS.SHOW_ONBOARDING, false);
+  };
+
+  const handleAddPatchReservation = useCallback(
+    (res: Omit<AppConfig["patchReservations"][0], "id" | "createdAt">) => {
+      const newRes = {
+        ...res,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString(),
+      };
+      window.electronAPI.triggerPatchReservation(newRes);
+    },
+    [],
+  );
+
+  const handleRemovePatchReservation = useCallback((id: string) => {
+    window.electronAPI.deletePatchReservation(id);
+  }, []);
+
+  const handleSilentPatchNotificationToggle = useCallback(
+    (enabled: boolean) => {
+      window.electronAPI.setConfig(
+        CONFIG_KEYS.SILENT_PATCH_NOTIFICATION,
+        enabled,
+      );
+    },
+    [],
+  );
+
+  const handleTerminateAfterPatchToggle = useCallback((enabled: boolean) => {
+    window.electronAPI.setConfig(CONFIG_KEYS.TERMINATE_AFTER_PATCH, enabled);
+  }, []);
+
+  // --- Auto Scaling Logic (Scale-to-Fit) ---
+  const BASE_WIDTH = 1440;
+  const BASE_HEIGHT = 960;
+  const [scale, setScale] = useState(() => {
+    // Initial calculation to prevent 1.0 -> actual_scale flicker
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    const widthRatio = windowWidth / BASE_WIDTH;
+    const heightRatio = windowHeight / BASE_HEIGHT;
+    return Math.min(widthRatio, heightRatio);
+  });
+
+  useEffect(() => {
+    const updateScale = () => {
+      const windowWidth = window.innerWidth;
+      const windowHeight = window.innerHeight;
+
+      // Calculate ratios for both dimensions
+      const widthRatio = windowWidth / BASE_WIDTH;
+      const heightRatio = windowHeight / BASE_HEIGHT;
+
+      // Use the smaller ratio to ensure UI fits within the window
+      const newScale = Math.min(widthRatio, heightRatio);
+      setScale(newScale);
+
+      // Sync CSS variable for modals and other floating elements
+      document.documentElement.style.setProperty(
+        "--app-scale",
+        newScale.toString(),
+      );
+    };
+
+    updateScale();
+    window.addEventListener("resize", updateScale);
+    return () => window.removeEventListener("resize", updateScale);
+  }, []);
+
+  return (
+    <>
+      {TEST_CRASH_MODE !== "NONE" && <TestCrashComponent />}
+      <OnboardingModal
+        isOpen={config.showOnboarding}
+        onFinish={handleOnboardingFinish}
+      />
+
+      <MigrationModal
+        isOpen={isMigrationModalOpen}
+        onConfirm={handleMigrationConfirm}
+        onCancel={handleMigrationCancel}
+      />
+
+      <KakaoStarterUacModal
+        isOpen={isKakaoStarterUacModalOpen}
+        onConfirm={handleKakaoStarterUacConfirm}
+        onDecline={handleKakaoStarterUacDecline}
+      />
+
+      <KakaoStarterMigrationModal
+        request={kakaoStarterMigrationRequest}
+        onInstall={handleOpenKakaoStarterInstaller}
+        onUninstallDaum={handleUninstallDaumGameStarter}
+        onClose={handleCloseKakaoStarterMigration}
+      />
+
+      <KakaoMaintenanceModal
+        info={kakaoMaintenanceInfo}
+        onClose={() => setKakaoMaintenanceInfo(null)}
+      />
+
+      <FontMigrationModal
+        isOpen={isFontMigrationOpen}
+        onConfirm={handleFontMigrationConfirm}
+        onCancel={() => setIsFontMigrationOpen(false)}
+        isGameRunning={isFontMigrationBlockedByRunningGame}
+      />
+
+      {isChangelogOpen && (
+        <ChangelogModal
+          changelogs={changelogs}
+          oldVersion={versionRange.old}
+          newVersion={versionRange.new}
+          onClose={() => setIsChangelogOpen(false)}
+        />
+      )}
+
+      <UpdateModal
+        isOpen={isUpdateModalOpen}
+        version={
+          (updateState.state === "available" ||
+            updateState.state === "downloaded" ||
+            updateState.state === "downloading") &&
+          "version" in updateState
+            ? updateState.version || ""
+            : ""
+        }
+        status={updateState}
+        onUpdate={handleUpdateClick}
+        onInstall={handleInstallClick}
+        onClose={handleUpdateDismiss}
+      />
+
+      <GamePathDiagnosticModal
+        isOpen={gamePathModalState !== null}
+        mode={gamePathModalState?.mode ?? "missing"}
+        serviceId={gamePathModalState?.serviceId ?? config.serviceChannel}
+        gameId={gamePathModalState?.gameId ?? config.activeGame}
+        diagnostics={gamePathModalState?.diagnostics ?? null}
+        busy={gamePathModalState?.busy ?? false}
+        errorMessage={gamePathModalState?.errorMessage}
+        highlightManual={gamePathModalState?.highlightManual ?? false}
+        showRegistrySyncConfirm={
+          gamePathModalState?.showRegistrySyncConfirm ?? false
+        }
+        showRegistryClearConfirm={
+          gamePathModalState?.showRegistryClearConfirm ?? false
+        }
+        manualSaveToastId={gamePathModalState?.manualSaveToastId}
+        onClose={handleGamePathModalClose}
+        onContextChange={handleGamePathContextChange}
+        onUsePath={handleUseGamePath}
+        onClearPath={(source) => void handleClearGamePath(source)}
+        onManualSelect={handleManualGamePathSelect}
+        onRegistrySyncConfirmClose={handleGamePathConflictConfirmClose}
+        onRegistryClearConfirmClose={handleGamePathRegistryClearConfirmClose}
+        onKeepLauncherConfig={() =>
+          void handleResolveGamePathConflict("launcher-config-only")
+        }
+        onSyncRegistry={() =>
+          void handleResolveGamePathConflict("sync-registry")
+        }
+        onConfirmClearRegistry={() =>
+          void handleClearGamePath("registry", true)
+        }
+        onInstall={
+          gamePathModalState?.mode === "missing"
+            ? handleGamePathInstall
+            : undefined
+        }
+      />
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={closeSettings}
+        initialSettingId={settingsFocusId}
+      />
+
+      <PatchFixModal
+        isOpen={patchModalState.isOpen}
+        mode={patchModalState.mode}
+        gameId={patchModalState.gameId}
+        serviceId={patchModalState.serviceId}
+        progress={patchModalState.progress}
+        autoStart={patchModalState.autoStart}
+        onConfirm={handlePatchConfirm}
+        onCancel={handlePatchCancel}
+        onClose={handlePatchClose}
+      />
+
+      {/* Modal: Patch Reservation */}
+      <PatchReservationModal
+        isOpen={isPatchReservationOpen}
+        reservations={config.patchReservations}
+        activeGame={config.activeGame}
+        activeService={config.serviceChannel}
+        silentNotification={config.silentPatchNotification}
+        terminateAfterPatch={config.terminateAfterPatch}
+        onSilentToggle={handleSilentPatchNotificationToggle}
+        onTerminateAfterPatchToggle={handleTerminateAfterPatchToggle}
+        onAdd={handleAddPatchReservation}
+        onDelete={handleRemovePatchReservation}
+        onClose={() => setIsPatchReservationOpen(false)}
+        onNavigateToSetting={openSettingsWithFocus}
+        launcherConfig={{
+          autoLaunch: config.autoLaunch,
+          closeAction: config.closeAction,
+          autoFixPatchError: config.autoFixPatchError,
+          skipDaumGameStarterUac: config.skipDaumGameStarterUac,
+          serviceChannel: config.serviceChannel,
+        }}
+      />
+
+      <FontManagerModal
+        isVisible={isFontModalOpen}
+        onClose={() => setIsFontModalOpen(false)}
+        gameId={config.activeGame}
+        onOpenCatalog={() => setIsFontCatalogOpen(true)}
+      />
+
+      <FontCatalogModal
+        isVisible={isFontCatalogOpen}
+        onClose={() => setIsFontCatalogOpen(false)}
+        onFontInstalled={() => {
+          // 폰트 설치 시 UI 갱신 유도
+        }}
+      />
+
+      <NoticeModal
+        item={selectedNotice}
+        onClose={() => setSelectedNotice(null)}
+      />
+
+      {isForcedRepairOpen && repairVersionInfo && (
+        <ForcedRepairModal
+          key={`${config.activeGame}-${repairVersionInfo.version}`}
+          isOpen={isForcedRepairOpen}
+          gameId={config.activeGame}
+          serviceId={config.serviceChannel}
+          versionInfo={repairVersionInfo}
+          remoteVersion={remoteVersions?.[config.activeGame]?.version}
+          onCancel={() => setIsForcedRepairOpen(false)}
+          onConfirm={handleForcedRepairConfirm}
+        />
+      )}
+
+      {/* Scalable UI Content */}
+      <div
+        className="app-scaler"
+        style={{
+          transform: `scale(${scale})`,
+          width: `${BASE_WIDTH}px`,
+          height: `${BASE_HEIGHT}px`,
+          transformOrigin: "center center",
+          display: "flex",
+          flexDirection: "column",
+          position: "relative",
+          zIndex: 10,
+          flexShrink: 0,
+          backgroundColor: "#000",
+        }}
+      >
+        {/* Background Layer (Now inside Scaler to create Letterbox effect) */}
+
+        <div
+          id="app-background"
+          style={{
+            backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('${bgImage}')`,
+            opacity: bgOpacity,
+            transition: "opacity 0.4s ease-in-out",
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundSize: "cover",
+            backgroundPosition: "center top",
+            zIndex: 0,
+          }}
+        />
+        {/* 1. Top Title Bar (Outside Frame, High Z-Index) */}
+        <TitleBar
+          title={appTitle}
+          showUpdateIcon={
+            updateState.state === "available" ||
+            updateState.state === "downloading" ||
+            updateState.state === "downloaded"
+          }
+          onUpdateClick={() => setIsUpdateModalOpen(true)}
+          devMode={config.dev_mode}
+          debugConsole={config.debug_console}
+        />
+
+        {/* 2. Main Content Frame */}
+        <div
+          className="app-main-content"
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            position: "relative",
+            zIndex: 10,
+            minHeight: 0 /* Force flex constraints */,
+            overflow: "hidden" /* Clip any runaway contents */,
+            paddingTop:
+              "32px" /* Ensure content starts below absolute TitleBar */,
+          }}
+        >
+          {/* Gothic Top Frame Decorations (Now Inside Main Content) */}
+          <div
+            className={`frame-decoration top-center ${
+              isTopCenterTitlebarHovered ? "titlebar-hover" : ""
+            }`}
+          >
+            {/* Blue Fire Overlay (Localized Ripple) */}
+            <div className="top-center-blue" />
+            {/* Interactive Hit Zone for Blue Fire (Top Central Demon) */}
+            <div className="top-center-trigger" />
+          </div>
+          <div className="frame-decoration top-left"></div>
+          <div className="frame-decoration top-right"></div>
+
+          <div className="app-layout">
+            {/* === Left Panel: Controls (400px width) === */}
+            <div className="left-panel">
+              {/* Section A: Game Selector (Top) */}
+              <div style={{ marginTop: "10px" }}>
+                <GameSelector
+                  activeGame={config.activeGame}
+                  onGameChange={handleGameChange}
+                  poe1Theme={poe1Theme}
+                  poe2Theme={poe2Theme}
+                />
+              </div>
+
+              {/* Section B: Menu Area (Middle) - Flex Grow */}
+              <div
+                className="middle-menu-area"
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "flex-start" /* Top align */,
+                  alignItems: "flex-start" /* Left align */,
+                  paddingTop: "40px" /* Some top spacing */,
+                  paddingLeft: "20px" /* Small padding for left alignment */,
+                  paddingRight: "20px" /* Symmetric padding */,
+                }}
+              >
+                <SupportLinks
+                  remoteVersions={remoteVersions}
+                  onForcedRepairRequest={handleForcedRepairRequest}
+                  onPatchReservationRequest={() =>
+                    setIsPatchReservationOpen(true)
+                  }
+                  onFontManagerSettingsRequest={() =>
+                    openSettingsWithFocus("openFontManagerBtn")
+                  }
+                />
+              </div>
+
+              {/* Section C: Game Start & Company Logos (Bottom) */}
+              <div className="bottom-controls">
+                <div style={{ width: "340px", marginBottom: "4px" }}>
+                  <ServiceChannelSelector
+                    channel={config.serviceChannel}
+                    onChannelChange={handleChannelChange}
+                    onSettingsClick={() => setIsSettingsOpen(true)}
+                  />
+                </div>
+
+                {/* Official Links (Homepage/Trade) */}
+                <OfficialLinkButtons
+                  activeGame={config.activeGame}
+                  serviceChannel={config.serviceChannel}
+                />
+
+                {isSteamDeck && (
+                  <div className="official-links-container">
+                    {(["lsfg", "mako"] as const).map((engine) => {
+                      const active = getFrameGenerationMode(config) === engine;
+                      return (
+                        <button
+                          key={engine}
+                          className="official-link-btn frame-generation-btn"
+                          onClick={() =>
+                            window.electronAPI?.setConfig(
+                              "frameGenerationMode",
+                              toggleFrameGenerationMode(
+                                getFrameGenerationMode(config),
+                                engine,
+                              ),
+                            )
+                          }
+                          title="변경 후 게임을 다시 실행하면 적용됩니다"
+                          aria-pressed={active}
+                        >
+                          {engine === "lsfg" ? "LSFG-VK" : "MAKO"}{" "}
+                          {active ? "ON" : "OFF"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {isSteamDeck && config.activeGame === "POE2" && (
+                  <div className="fsr-lite-controls">
+                    <button
+                      className="official-link-btn frame-generation-btn fsr-lite-btn"
+                      aria-pressed={config.fsrLiteEnabled}
+                      disabled={fsrBusy}
+                      onClick={() => void toggleFsrLite()}
+                      title="게임 종료 후 변경: OptiScaler 0.9.4 + FSR 4.1.2 INT8 Lite 설치/해제 (Reflex OFF)"
+                    >
+                      {fsrBusy
+                        ? "FSR 적용 중…"
+                        : `FSR 4.1.2 ${config.fsrLiteEnabled ? "ON" : "OFF"}`}
+                    </button>
+                    {fsrError && (
+                      <div role="alert" className="fsr-lite-error">
+                        {fsrError}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* [SteamDeck] PoE1 무음 모드 — 필터 알림음만 남기고 음향을
+                    꺼서 성능 향상 (production_Config.ini 편집, 재실행 시 적용) */}
+                {isSteamDeck && config.activeGame === "POE1" && (
+                  <button
+                    onClick={() =>
+                      window.electronAPI?.setConfig(
+                        "poe1QuietSoundEnabled",
+                        !(config.poe1QuietSoundEnabled === true),
+                      )
+                    }
+                    title="게임 음향을 꺼서 성능을 올립니다 (아이템 필터 알림음만 유지) — 변경 후 게임을 다시 실행하면 적용됩니다"
+                    style={{
+                      width: "340px",
+                      margin: "4px 0",
+                      padding: "6px 12px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      background:
+                        config.poe1QuietSoundEnabled === true
+                          ? "var(--theme-accent)"
+                          : "rgba(0, 0, 0, 0.45)",
+                      color:
+                        config.poe1QuietSoundEnabled === true ? "#000" : "#ddd",
+                      border: "1px solid var(--theme-accent)",
+                      borderRadius: "6px",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      aria-hidden="true"
+                      style={{ flexShrink: 0 }}
+                    >
+                      {/* 스피커 본체 */}
+                      <path d="M3 9v6h4l5 4.5v-15L7 9H3z" />
+                      {config.poe1QuietSoundEnabled === true ? (
+                        /* 음소거 X */
+                        <path
+                          d="M15.5 9.5l5 5m0-5l-5 5"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          fill="none"
+                        />
+                      ) : (
+                        /* 음파 */
+                        <path
+                          d="M15.5 8.5a5 5 0 010 7M18 6a9 9 0 010 12"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          fill="none"
+                        />
+                      )}
+                    </svg>
+                    무음 모드(필터음만){" "}
+                    {config.poe1QuietSoundEnabled === true ? "ON" : "OFF"}
+                  </button>
+                )}
+
+                <GameStartButton
+                  onClick={handleGameStart}
+                  label={gameStartButtonLabel}
+                  disabled={isButtonDisabled}
+                  className={isButtonDisabled ? "disabled" : ""}
+                  style={
+                    isButtonDisabled
+                      ? {
+                          opacity: 0.5,
+                          cursor: "not-allowed",
+                          pointerEvents: "none",
+                        }
+                      : {}
+                  }
+                />
+
+                {/* Progress Info Message */}
+                <div
+                  className={
+                    shouldShowGamePathManualPrompt
+                      ? "active-status-message with-action"
+                      : "active-status-message"
+                  }
+                  style={{
+                    height: "20px",
+                    marginTop: "2px",
+                    marginBottom: "2px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--theme-accent)",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    textShadow: "0 1px 2px rgba(0,0,0,0.5)",
+                    opacity: activeStatusMessage ? 1 : 0,
+                    transition: "opacity 0.3s ease-in-out",
+                  }}
+                >
+                  {shouldShowGamePathManualPrompt ? (
+                    <>
+                      <span>이미 게임이 설치되어 있나요?</span>
+                      <button
+                        type="button"
+                        className="status-manual-path-button"
+                        onClick={() =>
+                          void openGamePathModal(
+                            "missing",
+                            config.serviceChannel,
+                            config.activeGame,
+                            { highlightManual: true },
+                          )
+                        }
+                      >
+                        수동 설정
+                      </button>
+                    </>
+                  ) : (
+                    activeStatusMessage || " "
+                  )}
+                </div>
+
+                {/* Company Logos - Removed and moved to Service Channel Dropdown */}
+                <div className="company-logos" style={{ display: "none" }} />
+              </div>
+            </div>
+
+            {/* === Right Panel: Content Area === */}
+            <div className="right-panel">
+              <div className="news-refresh-toolbar">
+                <div className="news-open-mode-panel">
+                  <span className="news-open-mode-label">게시글 보기:</span>
+                  <div
+                    className="news-open-mode-toggle"
+                    role="group"
+                    aria-label="게시글 열기 방식"
+                  >
+                    {NEWS_OPEN_MODE_OPTIONS.map((option) => (
+                      <button
+                        key={option.mode}
+                        className={`news-open-mode-button ${
+                          currentNewsOpenMode === option.mode ? "active" : ""
+                        }`}
+                        onClick={() => handleNewsOpenModeChange(option.mode)}
+                        title={option.label}
+                        aria-label={option.label}
+                        aria-pressed={currentNewsOpenMode === option.mode}
+                        type="button"
+                      >
+                        <span className="material-symbols-outlined">
+                          {option.icon}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="news-refresh-status-panel">
+                  <span className="news-refresh-toolbar-time">
+                    {formatNewsRefreshTime(newsLastUpdatedAt)}
+                  </span>
+                  <button
+                    className="news-refresh-toolbar-button"
+                    onClick={handleManualNewsRefresh}
+                    disabled={isNewsRefreshing}
+                    title="전체 게시판 새로고침"
+                    aria-label="전체 게시판 새로고침"
+                    type="button"
+                  >
+                    <span
+                      className={`material-symbols-outlined ${
+                        isNewsRefreshing ? "spinning" : ""
+                      }`}
+                    >
+                      refresh
+                    </span>
+                  </button>
+                </div>
+              </div>
+              <div className="dev-notice-container">
+                <NewsSection
+                  title="개발자 공지사항"
+                  items={devNotices}
+                  forumUrl=""
+                  openMode={currentNewsOpenMode}
+                  onRead={handleDevRead}
+                  onShowModal={handleNoticeClick}
+                  isDevSection={true}
+                  headerVariant="long"
+                />
+              </div>
+              <NewsDashboard
+                activeGame={config.activeGame}
+                serviceChannel={config.serviceChannel}
+                openMode={currentNewsOpenMode}
+                onItemClick={handleNoticeClick}
+              />
+            </div>
+          </div>
+
+          {/* Footer Section (Button + Image Separation) */}
+          <div className="footer-section">
+            {/* 1. Background Image Wrapper (Clipped) */}
+            <div className="footer-bg-wrapper">
+              <img
+                src={bannerBottom}
+                className="footer-bg-image"
+                alt="Footer Banner"
+              />
+            </div>
+
+            {/* 2. Content Overlay (Text & Icon) */}
+            <div className="footer-content">
+              <span className="credits-text">Powered by NERDHEAD LAB</span>
+              <a
+                href={SUPPORT_URLS.GITHUB_REPO}
+                target="_blank"
+                className="github-link"
+              >
+                <img
+                  src={iconGithub}
+                  className="github-icon"
+                  alt="GitHub Repo"
+                />
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <ThemeRevalidator />
+    </>
+  );
+}
+
+export default App;

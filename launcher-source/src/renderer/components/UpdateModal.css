@@ -1,0 +1,236 @@
+.update-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.update-modal-content {
+  background: var(--theme-footer, #1a1a1a);
+  border: 1px solid var(--theme-accent, #af944f);
+  padding: 30px;
+  border-radius: 8px;
+  width: 600px; /* Match ChangelogModal width */
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+  transform: scale(var(--app-scale, 1));
+  transform-origin: center center;
+  animation: slideUp 0.3s ease-out;
+
+  /* Low Resolution Support */
+  max-height: calc(92vh / var(--app-scale, 1));
+  display: flex;
+  flex-direction: column;
+}
+
+.update-title {
+  color: var(--theme-accent, #af944f);
+  font-size: 21px;
+  margin-bottom: 25px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.update-title-version {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: normal;
+}
+
+.update-info-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.update-message {
+  color: #888;
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: left;
+  margin-bottom: 5px;
+}
+
+/* Adjust reused changelog components for update modal */
+.update-changelog-list {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 0 8px 0 0 !important; /* Fixed typo and adjusted padding */
+  background: transparent !important;
+  text-align: left;
+}
+
+/* Custom Scrollbar for Update Modal */
+.update-changelog-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.update-changelog-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.update-changelog-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+}
+
+.update-changelog-list::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-accent, #af944f);
+}
+
+.changelog-loading {
+  color: #555;
+  padding: 40px;
+  font-size: 14px;
+}
+
+/* Progress Area */
+.update-progress-wrapper {
+  margin-top: 15px;
+  padding: 10px 0;
+}
+
+.update-progress-container {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  height: 8px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.update-progress-bar {
+  height: 100%;
+  background: var(--theme-accent, #af944f);
+  transition: width 0.3s ease;
+  box-shadow: 0 0 10px var(--theme-accent, #af944f);
+}
+
+.update-progress-text {
+  color: var(--theme-accent, #af944f);
+  font-size: 12px;
+  font-weight: bold;
+  display: block;
+  text-align: right;
+}
+
+/* Actions */
+.update-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.update-primary-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 15px;
+}
+
+.update-secondary-actions {
+  display: flex;
+  align-items: center;
+}
+
+.btn-update-primary {
+  background: var(--theme-accent, #af944f);
+  color: #000;
+  border: none;
+  padding: 12px 28px;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.btn-update-primary:hover {
+  filter: brightness(1.15);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.btn-update-primary.disabled {
+  background: #444;
+  color: #777;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-update-secondary {
+  background: transparent;
+  color: #888;
+  border: 1px solid #333;
+  padding: 12px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.btn-update-secondary:hover {
+  border-color: #555;
+  color: #aaa;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-update-manual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  color: #666;
+  border: 1px dashed #444;
+  padding: 11px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-update-manual:hover {
+  border-color: #666;
+  color: #999;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    transform: scale(var(--app-scale, 1)) translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(var(--app-scale, 1)) translateY(0);
+    opacity: 1;
+  }
+}

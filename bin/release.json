@@ -1,0 +1,11 @@
+{
+  "version": "1.4.2-sd.19-local.20261107",
+  "sha256": "4ca1ba347608eb3b79e05ac0455890fde73b01c5f612767b11e9ce812baff81a",
+  "features": [
+    "LSFG-VK / MAKO mutually exclusive",
+    "FSR 4.1.2 INT8 Lite + OptiScaler 0.9.4",
+    "Reflex OFF",
+    "Watermark auto",
+    "repeat launch fix"
+  ]
+}

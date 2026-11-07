@@ -1,0 +1,75 @@
+import { AppConfig } from "./types";
+
+// Common Type for Service -> Game mapping
+type ServiceGameMap<T = string> = Record<
+  AppConfig["serviceChannel"],
+  Record<AppConfig["activeGame"], T>
+>;
+
+// 1. Base Domain URLs
+export const BASE_URLS: ServiceGameMap = {
+  GGG: {
+    POE1: "https://www.pathofexile.com",
+    POE2: "https://pathofexile2.com",
+  },
+  "Kakao Games": {
+    POE1: "https://poe.kakaogames.com",
+    POE2: "https://pathofexile2.kakaogames.com/main",
+  },
+};
+
+// 2. Download Page Mapping
+export const DOWNLOAD_URLS: ServiceGameMap = {
+  GGG: {
+    POE1: "https://www.pathofexile.com/download",
+    POE2: "https://pathofexile2.com/download",
+  },
+  "Kakao Games": {
+    POE1: "https://poe.kakaogames.com/download",
+    POE2: "https://pathofexile2.kakaogames.com/main",
+  },
+};
+
+export const KAKAO_GAMES_STARTER_DOWNLOAD_URL =
+  "https://common.gdn.gamecdn.net/live/KakaogamesStarterSetup.exe";
+
+// 3. News & Forum Base URLs
+// Forums bases are per-service (GGG shares domain, Kakao shares domain)
+export const FORUM_URLS: Record<AppConfig["serviceChannel"], string> = {
+  GGG: "https://www.pathofexile.com/forum/view-forum",
+  "Kakao Games": "https://poe.kakaogames.com/forum/view-forum",
+};
+
+// 4. Support & External Links
+export const SUPPORT_URLS = {
+  EMAIL: __APP_AUTHOR_EMAIL__,
+  DONATION:
+    "https://nerdhead-lab.github.io/POE2-unofficial-launcher?docs=SUPPORT_KR.md",
+  DISCORD_INVITE: "https://discord.gg/aYrPYdvGEn",
+  DISCORD_ERRORS:
+    "https://discord.com/channels/1455427555883749439/1479304995940733019",
+  DISCORD_SUGGESTIONS:
+    "https://discord.com/channels/1455427555883749439/1479304951313469621",
+  // [SteamDeck] 스팀덱 포크 관련 건의/이슈는 포크 저장소로 받는다
+  ISSUES:
+    "https://github.com/sunim87/decky-poe-launcher/issues",
+  GITHUB_REPO:
+    "https://github.com/sunim87/decky-poe-launcher",
+  LATEST_VERSIONS_JSON:
+    "https://nerdhead-lab.github.io/POE2-unofficial-launcher/latest-versions.json",
+  THEMES_JSON:
+    "https://nerdhead-lab.github.io/POE2-unofficial-launcher/themes.json",
+  ASSETS_BASE: "https://nerdhead-lab.github.io/POE2-unofficial-launcher/",
+};
+
+// 5. Trade Site URLs
+export const TRADE_URLS: ServiceGameMap = {
+  GGG: {
+    POE1: "https://www.pathofexile.com/trade",
+    POE2: "https://www.pathofexile.com/trade2",
+  },
+  "Kakao Games": {
+    POE1: "https://poe.kakaogames.com/trade",
+    POE2: "https://poe.kakaogames.com/trade2",
+  },
+};

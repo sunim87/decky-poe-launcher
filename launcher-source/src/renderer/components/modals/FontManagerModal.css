@@ -1,0 +1,808 @@
+.font-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 12000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.font-modal-overlay.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.font-modal {
+  width: 840px;
+  height: 740px;
+  background: #121212;
+  border: 1px solid rgba(223, 207, 153, 0.2);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.9);
+  transform: scale(0.95) translateY(20px);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+}
+
+.font-modal-overlay.visible .font-modal {
+  transform: scale(1) translateY(0);
+}
+
+/* Header */
+.font-header {
+  padding: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(to right, #1a1a1a, #121212);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.font-header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: var(--theme-accent);
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.font-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.font-close-x {
+  background: transparent;
+  border: none;
+  color: #555;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+}
+
+.font-close-x:hover {
+  color: #fff;
+  transform: rotate(90deg);
+}
+
+/* Top Preview Area */
+.font-top-preview-section {
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.font-preview-img-container {
+  background: #ffffff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.font-preview-main-img {
+  max-height: 70px;
+  object-fit: contain;
+}
+
+.font-preview-placeholder {
+  color: #888;
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.font-preview-info {
+  position: absolute;
+  bottom: 8px;
+  left: 24px;
+  font-size: 0.75rem;
+  color: #555;
+}
+
+/* Modal Content & List */
+.font-content {
+  flex: 1;
+  overflow-y: auto;
+  background: #121212;
+}
+
+.font-matrix-header {
+  display: grid;
+  grid-template-columns: 180px 1fr 120px 120px 60px;
+  padding: 12px 24px;
+  background: #1a1a1a;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.font-matrix-header span {
+  font-size: 0.8rem;
+  color: #666;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+
+.font-matrix-header span:first-child,
+.font-matrix-header span:nth-child(2) {
+  text-align: left;
+}
+
+.font-list-container {
+  padding: 0;
+}
+
+.font-matrix-row {
+  display: grid;
+  grid-template-columns: 180px 1fr 120px 120px 60px;
+  padding: 16px 24px;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.font-matrix-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.font-matrix-row.selected {
+  background: rgba(223, 207, 153, 0.05);
+}
+
+/* Cells */
+.font-alias-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  padding: 10px 12px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.font-alias-cell:hover:not(.readonly) {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.font-alias-cell:hover:not(.readonly) .font-alias-text {
+  text-decoration: underline dashed rgba(255, 255, 255, 0.3);
+}
+
+.font-alias-cell.readonly {
+  cursor: default;
+}
+
+.font-alias-text {
+  font-weight: 600;
+  color: #eee;
+  font-size: 1.05rem;
+  transition: all 0.2s;
+}
+
+.font-alias-text:not(.font-label-default):hover {
+  color: var(--theme-accent);
+  cursor: pointer;
+  text-decoration: underline dashed;
+}
+
+.font-alias-text.font-label-default {
+  color: var(--theme-accent);
+}
+
+.font-original-name-cell {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.font-original-name {
+  font-size: 0.85rem;
+  color: #888;
+  font-family: "Consolas", monospace;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.font-alias-input {
+  background: #252525;
+  border: 1px solid var(--theme-accent);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 1rem;
+  outline: none;
+  width: 80%;
+}
+
+/* Radio Button Interface */
+.font-radio-cell {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.font-radio-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 24px;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+
+.font-radio-wrapper.disabled {
+  opacity: 0.35;
+  filter: grayscale(0.8);
+  cursor: not-allowed !important;
+}
+
+.font-radio-wrapper.disabled:hover {
+  background: transparent;
+}
+
+.font-radio-wrapper.active {
+  background: transparent;
+}
+
+.font-radio-indicator {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #444;
+  border-radius: 50%;
+  position: relative;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.font-radio-wrapper.active .font-radio-indicator {
+  border-color: var(--theme-accent);
+}
+
+.font-radio-wrapper.active .font-radio-indicator::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  background: var(--theme-accent);
+  border-radius: 50%;
+}
+
+.font-service-logo {
+  height: 18px;
+  object-fit: contain;
+  filter: grayscale(1) opacity(0.4);
+  transition: all 0.3s;
+}
+
+.font-radio-wrapper.active .font-service-logo {
+  filter: grayscale(0) opacity(1);
+}
+
+.font-service-logo.ggg {
+  height: 24px;
+}
+
+.font-delete-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.font-delete-btn {
+  background: transparent;
+  border: none;
+  color: #777;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.font-delete-btn .material-symbols-outlined {
+  font-size: 22px;
+}
+
+.font-delete-btn:hover:not(:disabled) {
+  background: rgba(220, 53, 69, 0.15);
+  color: #ff4444;
+}
+
+.font-delete-btn.disabled {
+  cursor: default;
+  opacity: 0.25;
+}
+
+/* Warning Banner */
+.font-warning-banner {
+  margin: 0 24px 16px;
+  padding: 12px 20px;
+  background: rgba(223, 207, 153, 0.04);
+  border: 1px solid rgba(223, 207, 153, 0.1);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.font-warning-banner .material-symbols-outlined {
+  color: var(--theme-accent);
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.font-warning-banner p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #999;
+}
+
+.font-warning-banner p strong {
+  color: var(--theme-accent);
+  font-weight: 600;
+}
+
+.font-warning-banner.running {
+  background: rgba(255, 87, 34, 0.08);
+  border-color: rgba(255, 87, 34, 0.2);
+}
+
+.font-warning-banner.running .material-symbols-outlined {
+  color: #ff5722;
+}
+
+.font-warning-banner.running p {
+  color: #ffab91;
+}
+
+.font-warning-banner.running p strong {
+  color: #ff5722;
+}
+
+/* 외부 폰트 감지 알림 그룹 */
+.font-conflict-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 에러 레벨 단일 카드 */
+.font-warning-banner.conflict-error-card {
+  background: rgba(255, 171, 0, 0.08); /* !important 제거 */
+  border: 1px solid rgba(255, 171, 0, 0.3); /* !important 제거 */
+  flex-direction: column;
+  align-items: stretch;
+  padding: 16px 20px;
+  gap: 10px;
+  height: auto;
+  min-height: unset;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.banner-main-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.conflict-text {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ffab00;
+  flex: 1;
+  overflow: hidden;
+}
+
+.conflict-text span {
+  font-size: 22px;
+}
+
+.conflict-text p {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.conflict-text p strong {
+  color: #ffab00;
+}
+
+.banner-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.action-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+}
+
+.action-btn.import {
+  background: #4ec9b0;
+  color: #000;
+}
+
+.action-btn.import:hover {
+  background: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(78, 201, 176, 0.4);
+}
+
+.action-btn.restore {
+  background: rgba(255, 255, 255, 0.05);
+  color: #eee;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.action-btn.restore:hover {
+  background: rgba(255, 171, 0, 0.15);
+  color: #ffab00;
+  border-color: #ffab00;
+  transform: translateY(-1px);
+}
+
+.banner-sub-row {
+  padding-left: 32px; /* 아이콘 너비만큼 들여쓰기 */
+}
+
+.banner-sub-row p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 500;
+}
+
+/* 조작 시도 시 하이라이트 깜빡임 애니메이션 */
+.font-warning-banner.conflict-error-card.flash {
+  animation: conflict-flash 0.6s ease-out;
+}
+
+@keyframes conflict-flash {
+  0% {
+    background: rgba(255, 171, 0, 0.08);
+    border-color: rgba(255, 171, 0, 0.3);
+    transform: scale(1);
+  }
+  30% {
+    background: rgba(255, 171, 0, 0.25);
+    border-color: rgba(255, 171, 0, 0.8);
+    transform: scale(1.01);
+    box-shadow: 0 0 20px rgba(255, 171, 0, 0.3);
+  }
+  100% {
+    background: rgba(255, 171, 0, 0.08);
+    border-color: rgba(255, 171, 0, 0.3);
+    transform: scale(1);
+  }
+}
+
+/* 독립된 소형 안내 배너 */
+.font-warning-banner.info-small {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  padding: 10px 16px;
+  min-height: auto;
+  opacity: 0.6;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.font-warning-banner.info-small span {
+  font-size: 18px;
+  color: #4ec9b0;
+}
+
+.font-warning-banner.info-small p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.font-warning-banner.info-small p strong {
+  color: #4ec9b0;
+}
+
+/* 쓰이지 않는 이전 스타일 정리 */
+.font-conflict-cards,
+.banner-conflict-content,
+.font-system-conflict-section {
+  display: none;
+}
+
+/* Cleanup old styles */
+/* Matrix Table Adjustments when conflict exists */
+.font-content:has(.font-system-conflict-section) .font-matrix-table {
+  display: none; /* No longer used at top */
+}
+
+/* Footer & Main Buttons */
+.font-footer {
+  padding: 24px;
+  background: #151515;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.font-library-actions {
+  display: flex;
+  gap: 16px;
+}
+
+.font-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.font-btn.primary {
+  background: var(--theme-accent);
+  color: #000;
+}
+
+.font-btn.primary:not(:disabled):hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(223, 207, 153, 0.3);
+}
+
+.font-btn.primary:disabled {
+  background: #333;
+  color: #666;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.font-btn.secondary {
+  background: #2a2a2a;
+  color: #ccc;
+}
+
+.font-btn.secondary:hover {
+  background: #333;
+  color: #fff;
+}
+
+.font-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Animations */
+.font-content::-webkit-scrollbar {
+  width: 6px;
+}
+.font-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+.font-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.font-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  backdrop-filter: blur(2px);
+}
+
+.font-loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.font-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(223, 207, 153, 0.1);
+  border-top-color: var(--theme-accent);
+  border-radius: 50%;
+  animation: font-spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes font-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Confirm Modal Styles (Imported from Settings.css for consistency) */
+.confirm-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(3px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.confirm-modal {
+  width: 400px;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  box-shadow: 0 15px 45px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+  animation: modalIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.confirm-header {
+  padding: 16px 20px;
+  background: #151515;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--theme-accent, #dfcf99);
+  border-bottom: 1px solid #282828;
+}
+
+.confirm-body {
+  padding: 24px 20px;
+  font-size: 14px;
+  color: #ccc;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.confirm-footer {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  background: #111;
+  border-top: 1px solid #282828;
+}
+
+.confirm-btn {
+  padding: 10px 24px;
+  border-radius: 4px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.confirm-btn.cancel {
+  background: #333;
+  color: #999;
+}
+
+.confirm-btn.cancel:hover {
+  background: #444;
+  color: #eee;
+}
+
+.confirm-btn.primary {
+  background: var(--theme-accent, #dfcf99);
+  color: #000;
+}
+
+.confirm-btn.primary:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 0 15px rgba(223, 207, 153, 0.2);
+}
+
+/* 사용 중 폰트 삭제 경고 스타일 */
+.delete-usage-warning {
+  margin: 16px 0;
+  padding: 12px 16px;
+  background: rgba(243, 156, 18, 0.08);
+  border: 1px solid rgba(243, 156, 18, 0.2);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.delete-usage-warning .material-symbols-outlined {
+  color: #f39c12;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.delete-usage-warning p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #f39c12;
+  line-height: 1.5;
+}
+
+.delete-usage-warning p strong {
+  color: #fff;
+  text-decoration: underline;
+}
+
+/* 인라인 진행률 바 (Phase 5) */
+.font-inline-progress {
+  width: 24px;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 0 auto;
+}
+
+.inline-progress-fill {
+  height: 100%;
+  background: var(--accent-color, #f39c12);
+  transition: width 0.3s ease;
+}

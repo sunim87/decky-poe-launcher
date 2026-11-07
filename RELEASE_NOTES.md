@@ -6,7 +6,7 @@ POE 스팀덱 수정 런처를 Decky에서 설치하고 게이밍 모드 라이�
 - 런처 제거 시 POE 게임 파일과 저장 데이터 보존
 - 홈페이지 변경·설치 감지 수정, 카카오 직접 실행, 게임 종료 후 같은 런처에서 재실행 개선
 - LSFG-VK / MAKO 상호 배타 버튼
-- OptiScaler 0.9.4 + FSR 4.1.2 INT8 Lite ON/OFF, Reflex OFF, 워터마크 표시 안 함
+- OptiScaler 0.9.4 + FSR 4.1.2 INT8 Lite ON/OFF
 - 버그 제보는 이 저장소의 Issues로 연결
 
 Steam의 Proton 10.0과 Steam Linux Runtime 3.0(sniper)이 필요합니다. LSFG-VK/MAKO 레이어 자체는 별도로 설치해야 합니다.

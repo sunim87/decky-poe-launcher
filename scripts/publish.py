@@ -49,3 +49,7 @@ elif sys.argv[1] == 'release':
 elif sys.argv[1] == 'verify':
     release = request('/repos/' + REPO + '/releases/tags/v0.1.0')
     print(json.dumps({'release':release['html_url'],'assets':[{'name':a['name'],'bytes':a['size'],'state':a['state'],'digest':a.get('digest')} for a in release['assets']]}))
+elif sys.argv[1] == 'notes':
+    release = request('/repos/' + REPO + '/releases/tags/v0.1.0')
+    result = request('/repos/' + REPO + '/releases/' + str(release['id']), {'body':(root / 'RELEASE_NOTES.md').read_text(encoding='utf8')}, method='PATCH')
+    print(result['html_url'])

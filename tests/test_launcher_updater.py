@@ -88,10 +88,12 @@ class Tests(unittest.TestCase):
             'while true; do\n  break\ndone\n'
         )
         wrapper.chmod(0o755)
-        self.updater.migrate_gamepad_wrapper()
+        self.updater.migrate_wrapper()
         updated = wrapper.read_text()
+        self.assertIn('--apply-only', updated)
+        self.assertNotIn('--check-and-apply', updated)
         self.assertLess(updated.index('export POE_GAMEPAD_STATE'), updated.index('while true; do'))
-        self.updater.migrate_gamepad_wrapper()
+        self.updater.migrate_wrapper()
         self.assertEqual(wrapper.read_text(), updated)
 
     def test_rejects_foreign_feed_downloads(self):

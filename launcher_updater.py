@@ -81,22 +81,29 @@ class LauncherUpdater:
         marker = self.app / '.launcher-build.json'
         return json.loads(marker.read_text(encoding='utf8')).get('build', 0) if marker.exists() else 0
 
-    def migrate_gamepad_wrapper(self):
+    def migrate_wrapper(self):
         wrapper = self.base / 'launch-poe2.sh'
         if wrapper.is_symlink() or not wrapper.is_file() or not (self.app / 'resources/gamepad_bridge.py').is_file():
             return
         script = wrapper.read_text(encoding='utf8')
         marker = 'while true; do\n'
-        if ('POE_GAMEPAD_STATE' in script or script.count(marker) != 1
-                or not script.startswith('#!/bin/bash\n')
-                or 'export POE_LAUNCHER_BASE="$base"\n' not in script
-                or '"$base/launcher_updater.py" --base "$base" --check-and-apply' not in script):
+        if (script.count(marker) != 1 or not script.startswith('#!/bin/bash\n')
+                or 'export POE_LAUNCHER_BASE="$base"\n' not in script):
+            return
+        old_command = '"$base/launcher_updater.py" --base "$base" --check-and-apply'
+        new_command = '"$base/launcher_updater.py" --base "$base" --apply-only'
+        if old_command not in script and new_command not in script:
+            return
+        updated = script.replace(old_command, new_command, 1)
+        if 'POE_GAMEPAD_STATE' not in script:
+            updated = updated.replace(marker, GAMEPAD_WRAPPER + marker)
+        if updated == script:
             return
         fd, name = tempfile.mkstemp(prefix='.launcher-wrapper-', dir=self.base)
         temporary = Path(name)
         try:
             with os.fdopen(fd, 'w', encoding='utf8', newline='\n') as output:
-                output.write(script.replace(marker, GAMEPAD_WRAPPER + marker))
+                output.write(updated)
             temporary.chmod(wrapper.stat().st_mode & 0o777)
             temporary.replace(wrapper)
         finally:
@@ -201,15 +208,16 @@ def main():
     modes.add_argument('--migrate-wrapper', action='store_true')
     args = parser.parse_args()
     updater = LauncherUpdater(args.base, args.request_id)
+    if args.migrate_wrapper:
+        updater.migrate_wrapper()
+        return 0
     import fcntl
     with (updater.base / '.launcher-update.lock').open('a') as lock:
         try: fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError: return
         try:
             updater.recover()
-            if args.migrate_wrapper:
-                updater.migrate_gamepad_wrapper()
-            elif args.download_only:
+            if args.download_only:
                 updater.download(updater.fetch_manifest())
             elif args.apply_only:
                 updater.apply()
@@ -218,8 +226,8 @@ def main():
                 try: updater.download(updater.fetch_manifest())
                 except Exception as error: print('Launcher update check:', type(error).__name__)
                 updater.apply()
-            if not args.download_only and not args.migrate_wrapper:
-                updater.migrate_gamepad_wrapper()
+            if not args.download_only:
+                updater.migrate_wrapper()
         except Exception as error:
             updater.status('error', message=str(error)[:300]); print('Launcher updater:', str(error)[:300])
             return 1

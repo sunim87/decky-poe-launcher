@@ -55,9 +55,9 @@ function location() {
   return { linux, wine: `Z:${linux.replace(/\//g, "\\")}` };
 }
 
-export function migratePortableGamepadWrapper() {
+export function migratePortableLauncherWrapper() {
   const linux = process.env.POE_LAUNCHER_BASE;
-  if (!linux?.startsWith("/") || linux.includes("\n") || process.env.POE_GAMEPAD_STATE) return;
+  if (!linux?.startsWith("/") || linux.includes("\n")) return;
   const child = spawn(
     "C:\\windows\\system32\\start.exe",
     [

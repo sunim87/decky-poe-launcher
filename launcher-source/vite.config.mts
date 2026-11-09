@@ -163,6 +163,17 @@ function isMissingTaskkillProcessError(error: unknown) {
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
+    {
+      name: "launcher-icon",
+      apply: "build",
+      generateBundle() {
+        this.emitFile({
+          type: "asset",
+          fileName: "icon.ico",
+          source: readFileSync(path.join(__dirname, "build/icon.ico")),
+        });
+      },
+    },
     react(),
     electron([
       {

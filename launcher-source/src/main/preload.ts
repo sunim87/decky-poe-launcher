@@ -31,6 +31,7 @@ const logger = new PreloadLogger({ type: "PRELOAD", typeColor: "#8BE9FD" });
 // Used by React Renderer (App.tsx)
 
 contextBridge.exposeInMainWorld("electronAPI", {
+  getNativeGamepad: () => ipcRenderer.invoke("gamepad:native-state"),
   triggerGameStart: (context: GameLaunchContext) => {
     logger.log("[Preload] Sending trigger-game-start to Main Process");
     ipcRenderer.send("trigger-game-start", context);

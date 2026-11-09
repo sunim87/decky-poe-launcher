@@ -717,6 +717,23 @@ ipcMain.handle("debug:get-history", () => {
   return getLogHistory();
 });
 
+ipcMain.handle("gamepad:native-state", async (event) => {
+  const state = process.env.POE_GAMEPAD_STATE;
+  if (
+    event.sender !== mainWindow?.webContents ||
+    !state?.startsWith("/") ||
+    !isWineEnvironment()
+  )
+    return null;
+  try {
+    const file = `Z:${state.replace(/\//g, "\\")}`;
+    if (Date.now() - (await fs.stat(file)).mtimeMs > 1500) return null;
+    return JSON.parse(await fs.readFile(file, "utf8"));
+  } catch {
+    return null;
+  }
+});
+
 // [Removed] Old session:logout handler (duplicates new partitioned one)
 
 const isSupportedGameInstallContext = (

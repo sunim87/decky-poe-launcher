@@ -19,8 +19,10 @@ const SettingsSidebar: React.FC<Props> = ({
       <div className="settings-header">설정</div>
       <div className="sidebar-menu">
         {categories.map((cat) => (
-          <div
+          <button
+            type="button"
             key={cat.id}
+            aria-pressed={activeCategoryId === cat.id}
             className={`sidebar-item ${activeCategoryId === cat.id ? "active" : ""}`}
             onClick={() => onSelectCategory(cat.id)}
           >
@@ -32,7 +34,7 @@ const SettingsSidebar: React.FC<Props> = ({
               {cat.icon}
             </span>
             <span>{cat.label}</span>
-          </div>
+          </button>
         ))}
       </div>
     </div>

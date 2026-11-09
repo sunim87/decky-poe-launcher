@@ -24,6 +24,45 @@ const FOCUSABLE_SELECTOR = [
 
 const STICK_THRESHOLD = 0.6;
 const MOVE_REPEAT_MS = 220;
+const MODAL_SELECTOR = [
+  '[aria-modal="true"]',
+  "dialog[open]",
+  ".settings-overlay",
+  ".confirm-overlay",
+  ".confirm-modal-overlay",
+  ".alias-dialog-overlay",
+  ".changelog-overlay",
+  ".notice-overlay",
+  ".font-catalog-overlay",
+  ".font-modal-overlay",
+  ".fds-overlay",
+  ".fds-confirm-overlay",
+  ".import-wizard-overlay",
+  ".forced-repair-overlay",
+  ".game-path-modal-overlay",
+  ".game-path-confirm-overlay",
+  ".onboarding-modal-overlay",
+  ".patch-fix-modal-overlay",
+  ".patch-reservation-modal-overlay",
+  ".update-modal-overlay",
+].join(", ");
+const CANCEL_SELECTOR = [
+  "[data-gamepad-cancel]",
+  ".alias-btn-cancel",
+  ".changelog-close-x",
+  ".notice-close-x",
+  ".settings-close-btn-inline",
+  ".catalog-close-btn",
+  ".font-close-x",
+  ".fds-close-x",
+  ".close-wizard-btn",
+  ".btn-close-icon",
+  ".btn-cancel",
+  ".cancel-btn",
+  ".confirm-btn.cancel",
+  ".btn-confirm-secondary",
+  ".btn-update-secondary",
+].join(", ");
 
 const BUTTON_A = 0;
 const BUTTON_B = 1;
@@ -37,18 +76,40 @@ const BUTTON_DPAD_RIGHT = 15;
 let rafId: number | null = null;
 let lastMoveAt = 0;
 const prevPressed = new Map<number, boolean[]>();
+let nativePad: { buttons: boolean[]; axes: number[] } | null = null;
 
-const getVisibleFocusables = (): HTMLElement[] => {
-  const root = document.body;
+const isVisible = (el: HTMLElement): boolean => {
+  const rect = el.getBoundingClientRect();
+  if (rect.width < 2 || rect.height < 2 || el.closest("[inert], [hidden]"))
+    return false;
+  const style = window.getComputedStyle(el);
+  return style.visibility === "visible" && style.display !== "none";
+};
+
+const getActiveModal = (): HTMLElement | undefined =>
+  Array.from(document.querySelectorAll<HTMLElement>(MODAL_SELECTOR))
+    .filter(isVisible)
+    .reduce<HTMLElement | undefined>((top, modal) => {
+      if (!top || top.contains(modal)) return modal;
+      if (modal.contains(top)) return top;
+      const layer = (el: HTMLElement) =>
+        Number(window.getComputedStyle(el).zIndex) || 0;
+      return layer(modal) >= layer(top) ? modal : top;
+    }, undefined);
+
+const getVisibleFocusables = (
+  root = getActiveModal() ?? document.body,
+): HTMLElement[] => {
   if (!root) return [];
 
   return Array.from(
     root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
   ).filter((el) => {
-    const rect = el.getBoundingClientRect();
-    if (rect.width < 2 || rect.height < 2) return false;
-    const style = window.getComputedStyle(el);
-    return style.visibility !== "hidden" && style.display !== "none";
+    return (
+      isVisible(el) &&
+      !el.matches(':disabled, [aria-disabled="true"]') &&
+      el.tabIndex >= 0
+    );
   });
 };
 
@@ -61,13 +122,8 @@ const moveFocus = (dx: number, dy: number): void => {
     document.activeElement instanceof HTMLElement &&
     candidates.includes(document.activeElement)
       ? document.activeElement
-      : null;
-
-  if (!active) {
-    candidates[0].focus();
-    candidates[0].scrollIntoView({ block: "nearest" });
-    return;
-  }
+      : (candidates.find((el) => el.matches(".main-start__link")) ??
+        candidates[0]);
 
   const cur = active.getBoundingClientRect();
   const cx = cur.left + cur.width / 2;
@@ -99,6 +155,8 @@ const moveFocus = (dx: number, dy: number): void => {
   if (best) {
     best.focus();
     best.scrollIntoView({ block: "nearest" });
+  } else {
+    active.focus();
   }
 };
 
@@ -112,19 +170,36 @@ const moveFocusSequential = (delta: 1 | -1): void => {
       : null;
   const index = active ? candidates.indexOf(active) : -1;
   const next =
-    candidates[(index + delta + candidates.length) % candidates.length];
+    candidates[
+      index < 0
+        ? delta > 0
+          ? 0
+          : candidates.length - 1
+        : (index + delta + candidates.length) % candidates.length
+    ];
   next.focus();
   next.scrollIntoView({ block: "nearest" });
 };
 
 const clickFocused = (): void => {
+  const modal = getActiveModal();
+  const candidates = getVisibleFocusables(modal ?? document.body);
   const active = document.activeElement;
-  if (active instanceof HTMLElement) {
+  if (active instanceof HTMLElement && candidates.includes(active)) {
     active.click();
+    return;
+  }
+  const initial = modal
+    ? candidates[0]
+    : candidates.find((el) => el.matches(".main-start__link"));
+  if (initial) {
+    initial.focus();
+    if (!modal) initial.click();
   }
 };
 
 const sendEscape = (): void => {
+  const modal = getActiveModal();
   const event = new KeyboardEvent("keydown", {
     key: "Escape",
     code: "Escape",
@@ -132,7 +207,13 @@ const sendEscape = (): void => {
     bubbles: true,
     cancelable: true,
   });
-  (document.activeElement ?? document.body).dispatchEvent(event);
+  const focused = document.activeElement;
+  const target =
+    modal && !modal.contains(focused) ? modal : (focused ?? document.body);
+  if (!target.dispatchEvent(event) || !modal) return;
+  getVisibleFocusables(modal)
+    .find((el) => el.matches(CANCEL_SELECTOR))
+    ?.click();
 };
 
 const ensureFocusStyle = (): void => {
@@ -149,7 +230,16 @@ const ensureFocusStyle = (): void => {
 };
 
 const pollGamepads = (): void => {
-  const pads = navigator.getGamepads?.() ?? [];
+  const pads = nativePad
+    ? [
+        {
+          connected: true,
+          index: -1,
+          buttons: nativePad.buttons.map((pressed) => ({ pressed })),
+          axes: nativePad.axes,
+        },
+      ]
+    : (navigator.getGamepads?.() ?? []);
   let anyConnected = false;
   const now = performance.now();
 
@@ -159,6 +249,17 @@ const pollGamepads = (): void => {
 
     const prev = prevPressed.get(pad.index) ?? [];
     const pressed = pad.buttons.map((b) => b.pressed);
+    if (!document.hasFocus()) {
+      prevPressed.set(pad.index, pressed);
+      continue;
+    }
+    if (document.activeElement === document.body && !getActiveModal()) {
+      const start =
+        document.querySelector<HTMLButtonElement>(".main-start__link");
+      if (start && !start.disabled && isVisible(start)) {
+        start.focus({ preventScroll: true });
+      }
+    }
     const justPressed = (i: number) => pressed[i] && !prev[i];
 
     if (justPressed(BUTTON_A)) clickFocused();
@@ -202,6 +303,17 @@ const pollGamepads = (): void => {
 
 export const initGamepadNav = (): void => {
   ensureFocusStyle();
+  const readNative = window.electronAPI?.getNativeGamepad;
+  if (readNative) {
+    const refresh = async () => {
+      nativePad = await readNative().catch(() => null);
+      if (nativePad && rafId === null)
+        rafId = requestAnimationFrame(pollGamepads);
+      if (!nativePad) prevPressed.delete(-1);
+      window.setTimeout(refresh, document.hasFocus() ? 25 : 250);
+    };
+    void refresh();
+  }
 
   window.addEventListener("gamepadconnected", () => {
     if (rafId === null) {
@@ -211,6 +323,9 @@ export const initGamepadNav = (): void => {
 
   window.addEventListener("mousedown", () => {
     document.body.classList.remove("gamepad-nav");
+  });
+  window.addEventListener("gamepaddisconnected", (event) => {
+    prevPressed.delete(event.gamepad.index);
   });
 
   // 이미 연결된 패드가 있는 경우 (새로고침 등)

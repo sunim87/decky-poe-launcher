@@ -66,7 +66,11 @@ const KakaoMaintenanceModal: React.FC<KakaoMaintenanceModalProps> = ({
           >
             점검 페이지 열기
           </button>
-          <button className="btn-confirm-primary btn-primary" onClick={onClose}>
+          <button
+            className="btn-confirm-primary btn-primary"
+            data-gamepad-cancel
+            onClick={onClose}
+          >
             확인
           </button>
         </div>

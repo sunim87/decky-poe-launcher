@@ -119,6 +119,12 @@ class Manager:
             'export DISABLE_LSFGVK_EXPERIMENTAL=1', 'export DISABLE_MAKO=1',
             'unset ENABLE_MAKO LSFGVK_PROFILE MAKO_PROFILE',
             'python3 "$base/launcher_updater.py" --base "$base" --check-and-apply >> "$base/launcher-update.log" 2>&1 || true',
+            'if [ -f "$base/launcher/resources/gamepad_bridge.py" ] && pad_dir=$(mktemp -d "$base/.gamepad-XXXXXX"); then',
+            '  export POE_GAMEPAD_STATE="$pad_dir/state.json"',
+            '  python3 "$base/launcher/resources/gamepad_bridge.py" "$POE_GAMEPAD_STATE" &',
+            '  pad_pid=$!',
+            '  trap \'kill "$pad_pid" 2>/dev/null || true; wait "$pad_pid" 2>/dev/null || true; rm -f -- "$POE_GAMEPAD_STATE" "$pad_dir/state.tmp"; rmdir -- "$pad_dir"\' EXIT',
+            'fi',
             'while true; do',
             '  launcher_status=0',
             '  ' + q(str(runtime)) + ' --verb=run -- "$POE_PROTON_PATH" run ' +

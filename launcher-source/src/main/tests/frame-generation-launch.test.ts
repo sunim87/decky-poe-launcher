@@ -7,6 +7,7 @@ import {
 } from "../game/frame-generation";
 
 const mocks = vi.hoisted(() => ({
+  stat: vi.fn(),
   mkdir: vi.fn(),
   writeFile: vi.fn(),
   rename: vi.fn(),
@@ -39,6 +40,24 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("game launch working directory", () => {
+  it("uses the Steam-selected Proton when the launcher wrapper variable is missing", async () => {
+    vi.stubEnv("POE_PROTON_PATH", undefined);
+    vi.stubEnv("STEAM_COMPAT_TOOL_PATHS", "/steam/sniper:/steam/Proton 10.0");
+    mocks.stat
+      .mockRejectedValueOnce(new Error("Missing proton"))
+      .mockResolvedValueOnce({ isFile: () => true });
+    await prepareFrameGeneration(
+      { ...DEFAULT_CONFIG, frameGenerationMode: "off" },
+      "C:\\Game\\PathOfExile_KG.exe",
+    );
+    expect(mocks.writeFile).toHaveBeenLastCalledWith(
+      expect.stringContaining("launch.sh.tmp"),
+      expect.stringContaining(
+        "export POE_PROTON_PATH='/steam/Proton 10.0/proton'",
+      ),
+      "utf8",
+    );
+  });
   it.each([true, false])(
     "isolates native Vulkan MAKO swapchain compatibility when FSR is %s",
     async (fsrLiteEnabled) => {

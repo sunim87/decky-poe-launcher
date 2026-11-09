@@ -353,6 +353,9 @@ const GameSelector: React.FC<GameSelectorProps> = ({
         src={poe1Theme?.assets?.logo ? poe1Theme.assets.logo : logoPoe}
         className="logo-item"
         alt="POE Logo"
+        role="button"
+        tabIndex={0}
+        aria-label="POE1 선택"
         style={createStyle(poe1)}
         onClick={(e) => handleClick(e, "POE1")}
       />
@@ -360,6 +363,9 @@ const GameSelector: React.FC<GameSelectorProps> = ({
         src={poe2Theme?.assets?.logo ? poe2Theme.assets.logo : logoPoe2}
         className="logo-item"
         alt="POE2 Logo"
+        role="button"
+        tabIndex={0}
+        aria-label="POE2 선택"
         style={createStyle(poe2)}
         onClick={(e) => handleClick(e, "POE2")}
       />

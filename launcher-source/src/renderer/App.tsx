@@ -924,7 +924,7 @@ function App() {
 
   // Compute Button Disabled State
   const isButtonDisabled = useMemo(() => {
-    if (fsrBusy) return true;
+    if (!isConfigLoaded || fsrBusy) return true;
     // Context mismatch check
     if (
       activeGameStatus.gameId !== config.activeGame ||
@@ -955,7 +955,13 @@ function App() {
 
     // Idle / Error -> Enabled
     return false;
-  }, [activeGameStatus, config.activeGame, config.serviceChannel, fsrBusy]);
+  }, [
+    activeGameStatus,
+    config.activeGame,
+    config.serviceChannel,
+    fsrBusy,
+    isConfigLoaded,
+  ]);
 
   // Whether the install needs patching: local last-seen version differs from remote latest.
   // Only meaningful when game is installed and we have both versions.

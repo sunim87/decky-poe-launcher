@@ -27,6 +27,7 @@
     ]
   },
   extraResources: [
+    { from: "../gamepad_bridge.py", to: "gamepad_bridge.py" },
     { from: "../launcher_updater.py", to: "launcher_updater.py" },
     {
       from: "src/main/assets",

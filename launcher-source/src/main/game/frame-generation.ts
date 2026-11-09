@@ -134,8 +134,24 @@ async function prepareUnixHelper(
   env: NodeJS.ProcessEnv,
   executablePath: string,
 ) {
-  if (!process.env.POE_PROTON_PATH) {
-    throw new Error("실행 스크립트에 POE_PROTON_PATH가 필요합니다.");
+  if (!env.POE_PROTON_PATH) {
+    for (const directory of (env.STEAM_COMPAT_TOOL_PATHS ?? "").split(":")) {
+      if (!directory.startsWith("/")) continue;
+      const candidate = path.posix.join(directory, "proton");
+      try {
+        if (!(await fs.stat(`Z:${candidate.replace(/\//g, "\\")}`)).isFile())
+          continue;
+      } catch {
+        continue;
+      }
+      env.POE_PROTON_PATH = candidate;
+      break;
+    }
+  }
+  if (!env.POE_PROTON_PATH) {
+    throw new Error(
+      "Proton 실행 파일을 찾지 못했습니다. Decky에서 런처 설치/복구를 누른 뒤 Steam 라이브러리의 POE2 Launcher로 실행해 주세요.",
+    );
   }
   const directory = path.join(app.getPath("userData"), "frame-generation");
   await fs.mkdir(directory, { recursive: true });
@@ -156,7 +172,7 @@ async function prepareUnixHelper(
       : `${prefix.replace(/\/$/, "")}/pfx/dosdevices/${gameDirectory[0].toLowerCase()}:/${suffix}`;
   const exports = Object.entries(env)
     .filter(([key]) =>
-      /^(LSFG|DISABLE_LSFG|MAKO|ENABLE_MAKO|DISABLE_MAKO|WINEDLLOVERRIDES$|ENABLE_GAMESCOPE_WSI$|DXVK_HDR$|DISABLE_VK_LAYER_VALVE_steam_overlay_1$)/.test(
+      /^(LSFG|DISABLE_LSFG|MAKO|ENABLE_MAKO|DISABLE_MAKO|POE_PROTON_PATH$|WINEDLLOVERRIDES$|ENABLE_GAMESCOPE_WSI$|DXVK_HDR$|DISABLE_VK_LAYER_VALVE_steam_overlay_1$)/.test(
         key,
       ),
     )

@@ -425,6 +425,10 @@ export interface RevalidateThemeColorsEventDetail {
 }
 
 export interface ElectronAPI {
+  getNativeGamepad?: () => Promise<{
+    buttons: boolean[];
+    axes: number[];
+  } | null>;
   getAllChangelogs: () => Promise<ChangelogItem[]>;
   onShowChangelog?: (
     callback: (

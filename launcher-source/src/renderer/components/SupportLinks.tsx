@@ -97,7 +97,9 @@ const SupportLinkItemRenderer: React.FC<{
   };
 
   return (
-    <div
+    <button
+      type="button"
+      disabled={disabled}
       onClick={handleClick}
       className={`support-link ${disabled ? "disabled" : ""}`}
       style={
@@ -107,7 +109,7 @@ const SupportLinkItemRenderer: React.FC<{
       }
     >
       {item.icon && (
-        <div
+        <span
           className="support-link-icon-wrapper"
           style={{
             width: "20px",
@@ -139,10 +141,10 @@ const SupportLinkItemRenderer: React.FC<{
               {item.icon}
             </span>
           )}
-        </div>
+        </span>
       )}
       {label}
-    </div>
+    </button>
   );
 };
 

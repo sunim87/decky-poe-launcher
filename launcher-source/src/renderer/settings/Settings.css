@@ -92,6 +92,11 @@
 }
 
 .sidebar-item {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
   display: flex;
   align-items: center;
   padding: 12px 24px;

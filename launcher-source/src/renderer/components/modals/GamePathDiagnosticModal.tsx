@@ -496,6 +496,7 @@ const GamePathDiagnosticModal: React.FC<GamePathDiagnosticModalProps> = ({
             type="button"
             className="game-path-action ghost"
             disabled={busy}
+            data-gamepad-cancel
             onClick={onClose}
           >
             닫기
@@ -552,6 +553,7 @@ const GamePathDiagnosticModal: React.FC<GamePathDiagnosticModalProps> = ({
                     type="button"
                     className="game-path-action ghost"
                     disabled={busy}
+                    data-gamepad-cancel
                     onClick={onRegistrySyncConfirmClose}
                   >
                     취소
@@ -610,6 +612,7 @@ const GamePathDiagnosticModal: React.FC<GamePathDiagnosticModalProps> = ({
                   type="button"
                   className="game-path-action ghost"
                   disabled={busy}
+                  data-gamepad-cancel
                   onClick={onRegistryClearConfirmClose}
                 >
                   취소

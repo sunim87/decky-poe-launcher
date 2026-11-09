@@ -77,6 +77,23 @@ class Tests(unittest.TestCase):
         self.assertFalse(self.updater.download(self.manifest))
         self.assertFalse(self.updater.pending.exists())
 
+    def test_migrates_legacy_wrapper_once(self):
+        bridge = self.updater.app / 'resources/gamepad_bridge.py'
+        bridge.parent.mkdir()
+        bridge.touch()
+        wrapper = self.base / 'launch-poe2.sh'
+        wrapper.write_text(
+            '#!/bin/bash\nexport POE_LAUNCHER_BASE="$base"\n'
+            'python3 "$base/launcher_updater.py" --base "$base" --check-and-apply\n'
+            'while true; do\n  break\ndone\n'
+        )
+        wrapper.chmod(0o755)
+        self.updater.migrate_gamepad_wrapper()
+        updated = wrapper.read_text()
+        self.assertLess(updated.index('export POE_GAMEPAD_STATE'), updated.index('while true; do'))
+        self.updater.migrate_gamepad_wrapper()
+        self.assertEqual(wrapper.read_text(), updated)
+
     def test_rejects_foreign_feed_downloads(self):
         self.manifest['url']='https://example.com/runtime.zip'
         with self.assertRaisesRegex(ValueError,'repository'):validate_manifest(self.manifest)

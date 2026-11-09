@@ -55,6 +55,21 @@ function location() {
   return { linux, wine: `Z:${linux.replace(/\//g, "\\")}` };
 }
 
+export function migratePortableGamepadWrapper() {
+  const linux = process.env.POE_LAUNCHER_BASE;
+  if (!linux?.startsWith("/") || linux.includes("\n") || process.env.POE_GAMEPAD_STATE) return;
+  const child = spawn(
+    "C:\\windows\\system32\\start.exe",
+    [
+      "/wait", "/unix", "/usr/bin/python3",
+      `${linux}/launcher/resources/launcher_updater.py`,
+      "--base", linux, "--migrate-wrapper",
+    ],
+    { stdio: "ignore", windowsHide: true },
+  );
+  child.on("error", () => {});
+}
+
 export async function checkPortableLauncherUpdate(notify: Status) {
   if (pendingDownload) return pendingDownload;
   notify({ state: "checking" });

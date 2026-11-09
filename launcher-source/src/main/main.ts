@@ -16,6 +16,7 @@ import {
   webContents,
   type OpenDialogOptions,
 } from "electron";
+import { migratePortableGamepadWrapper } from "./services/PortableLauncherUpdater";
 import JSZip from "jszip";
 
 import { ContextProvider } from "./context-provider";
@@ -3306,6 +3307,7 @@ ipcMain.handle("theme:sync-force", async () => {
 });
 
 app.whenReady().then(async () => {
+  migratePortableGamepadWrapper();
   // Register Font IPC Handlers early to avoid race conditions
   FontIpcHandler.register();
 

@@ -13,6 +13,13 @@ import zipfile
 FEED = 'https://github.com/sunim87/decky-poe-launcher/releases/latest/download/launcher-update.json'
 DOWNLOAD_PREFIX = 'https://github.com/sunim87/decky-poe-launcher/releases/download/'
 MAX_ARCHIVE = 1536 * 1024 * 1024
+GAMEPAD_WRAPPER = """if [ -f "$base/launcher/resources/gamepad_bridge.py" ] && pad_dir=$(mktemp -d "$base/.gamepad-XXXXXX"); then
+  export POE_GAMEPAD_STATE="$pad_dir/state.json"
+  python3 "$base/launcher/resources/gamepad_bridge.py" "$POE_GAMEPAD_STATE" &
+  pad_pid=$!
+  trap 'kill "$pad_pid" 2>/dev/null || true; wait "$pad_pid" 2>/dev/null || true; rm -f -- "$POE_GAMEPAD_STATE" "$pad_dir/state.tmp"; rmdir -- "$pad_dir"' EXIT
+fi
+"""
 
 
 def atomic_json(file, value):
@@ -73,6 +80,27 @@ class LauncherUpdater:
     def current(self):
         marker = self.app / '.launcher-build.json'
         return json.loads(marker.read_text(encoding='utf8')).get('build', 0) if marker.exists() else 0
+
+    def migrate_gamepad_wrapper(self):
+        wrapper = self.base / 'launch-poe2.sh'
+        if wrapper.is_symlink() or not wrapper.is_file() or not (self.app / 'resources/gamepad_bridge.py').is_file():
+            return
+        script = wrapper.read_text(encoding='utf8')
+        marker = 'while true; do\n'
+        if ('POE_GAMEPAD_STATE' in script or script.count(marker) != 1
+                or not script.startswith('#!/bin/bash\n')
+                or 'export POE_LAUNCHER_BASE="$base"\n' not in script
+                or '"$base/launcher_updater.py" --base "$base" --check-and-apply' not in script):
+            return
+        fd, name = tempfile.mkstemp(prefix='.launcher-wrapper-', dir=self.base)
+        temporary = Path(name)
+        try:
+            with os.fdopen(fd, 'w', encoding='utf8', newline='\n') as output:
+                output.write(script.replace(marker, GAMEPAD_WRAPPER + marker))
+            temporary.chmod(wrapper.stat().st_mode & 0o777)
+            temporary.replace(wrapper)
+        finally:
+            temporary.unlink(missing_ok=True)
 
     def recover(self):
         if not self.app.exists() and self.backup.is_dir() and not self.backup.is_symlink():
@@ -170,6 +198,7 @@ def main():
     modes.add_argument('--check-and-apply', action='store_true')
     modes.add_argument('--download-only', action='store_true')
     modes.add_argument('--apply-only', action='store_true')
+    modes.add_argument('--migrate-wrapper', action='store_true')
     args = parser.parse_args()
     updater = LauncherUpdater(args.base, args.request_id)
     import fcntl
@@ -178,7 +207,9 @@ def main():
         except BlockingIOError: return
         try:
             updater.recover()
-            if args.download_only:
+            if args.migrate_wrapper:
+                updater.migrate_gamepad_wrapper()
+            elif args.download_only:
                 updater.download(updater.fetch_manifest())
             elif args.apply_only:
                 updater.apply()
@@ -187,6 +218,8 @@ def main():
                 try: updater.download(updater.fetch_manifest())
                 except Exception as error: print('Launcher update check:', type(error).__name__)
                 updater.apply()
+            if not args.download_only and not args.migrate_wrapper:
+                updater.migrate_gamepad_wrapper()
         except Exception as error:
             updater.status('error', message=str(error)[:300]); print('Launcher updater:', str(error)[:300])
             return 1

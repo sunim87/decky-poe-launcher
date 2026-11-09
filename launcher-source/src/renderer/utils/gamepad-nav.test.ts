@@ -22,9 +22,9 @@ it("starts the selected game on first A, navigates, and keeps modal input isolat
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
     function (this: HTMLElement) {
       return {
-        left: 0,
-        top: this === start ? 100 : 0,
-        width: 20,
+        left: Number(this.dataset.left ?? 0),
+        top: Number(this.dataset.top ?? (this === start ? 100 : 0)),
+        width: Number(this.dataset.width ?? 20),
         height: 20,
       } as DOMRect;
     },
@@ -61,6 +61,33 @@ it("starts the selected game on first A, navigates, and keeps modal input isolat
   frame!(0);
   pad.axes[1] = 0;
   expect(document.activeElement).toBe(start);
+
+  const rows = [
+    ["donate", 0, 150, 340],
+    ["home", 0, 170, 165],
+    ["trade", 175, 170, 165],
+    ["lsfg", 0, 190, 165],
+    ["mako", 175, 190, 165],
+    ["play", 0, 210, 340],
+  ] as const;
+  for (const [id, left, top, width] of rows) {
+    const button = document.createElement("button");
+    button.id = id;
+    button.scrollIntoView = vi.fn();
+    Object.assign(button.dataset, { left, top, width });
+    document.body.append(button);
+  }
+  document.getElementById("play")!.focus();
+  press(12);
+  expect(document.activeElement?.id).toBe("lsfg");
+  press(15);
+  expect(document.activeElement?.id).toBe("mako");
+  press(12);
+  expect(document.activeElement?.id).toBe("trade");
+  press(14);
+  expect(document.activeElement?.id).toBe("home");
+  press(12);
+  expect(document.activeElement?.id).toBe("donate");
 
   const modal = document.createElement("div");
   modal.setAttribute("aria-modal", "true");

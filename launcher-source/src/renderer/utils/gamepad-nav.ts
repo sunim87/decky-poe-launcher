@@ -131,6 +131,8 @@ const moveFocus = (dx: number, dy: number): void => {
 
   let best: HTMLElement | null = null;
   let bestScore = Infinity;
+  let bestOffset = Infinity;
+  let bestAligned = false;
 
   for (const el of candidates) {
     if (el === active) continue;
@@ -143,11 +145,18 @@ const moveFocus = (dx: number, dy: number): void => {
     if (along <= 0) continue;
 
     // 방향에서 벗어난 정도에 페널티를 줘서 직관적인 이동을 만든다
-    const ortho = Math.abs(vx * dy - vy * dx);
-    const score = along + ortho * 2.5;
+    const offset = Math.abs(vx * dy - vy * dx);
+    const crossSpan = dx ? cur.height + rect.height : cur.width + rect.width;
+    const gap = Math.max(0, offset - crossSpan / 2);
+    const score = along + gap * 2.5;
+    const aligned = dx !== 0 && offset < crossSpan / 2;
 
-    if (score < bestScore) {
+    if ((aligned && !bestAligned) ||
+        (aligned === bestAligned &&
+          (score < bestScore || (score === bestScore && offset < bestOffset)))) {
       bestScore = score;
+      bestOffset = offset;
+      bestAligned = aligned;
       best = el;
     }
   }

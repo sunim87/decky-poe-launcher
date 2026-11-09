@@ -1,7 +1,7 @@
 {
-  "version": "1.4.2-sd.31",
-  "build": 13,
-  "sha256": "552169aee95104deb3eb06604822603dc1c79d6a59c0377aec84bab7067e7fa8",
+  "version": "1.4.2-sd.32",
+  "build": 14,
+  "sha256": "9c9aca11e3ffa0d326fd84213dd2ab65b82e61cffa4b8beddb48ed158bc157ca",
   "features": [
     "LSFG-VK / MAKO mutually exclusive",
     "FSR 4.1.2 INT8 Lite + OptiScaler 0.9.4",

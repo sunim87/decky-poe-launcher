@@ -39,6 +39,24 @@ beforeEach(() => {
 });
 
 describe("Kakao direct launch preparation lifecycle", () => {
+  it("clears a new automation watchdog when suppressing a duplicate launch", async () => {
+    mocks.fsr.mockResolvedValue(undefined);
+    const context = {
+      getConfig: () => ({ activeGame: "POE2" }),
+      disableValidationMode: vi.fn(),
+      getActiveAutomationWindow: () => window,
+      hideAutomationWindow: vi.fn(),
+    };
+    const window = { isDestroyed: () => false };
+    const { launchKakaoGameDirect } = await import("../game/KakaoDirectLaunch");
+    const url = "kakaogamesstarter://poe2|live|POE2_Launcher.exe|test-token|test-user";
+    expect(await launchKakaoGameDirect(context as never, url)).toBe(true);
+    vi.clearAllMocks();
+    expect(await launchKakaoGameDirect(context as never, url)).toBe(true);
+    expect(context.disableValidationMode).toHaveBeenCalledOnce();
+    expect(context.hideAutomationWindow).toHaveBeenCalledWith(window, "direct-launch-success");
+    expect(mocks.spawn).not.toHaveBeenCalled();
+  });
   it("rejects protocol launches while FSR files are changing", async () => {
     mocks.fsrChanging = true;
     const { launchKakaoGameDirect } = await import("../game/KakaoDirectLaunch");

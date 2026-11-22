@@ -2252,7 +2252,7 @@ function App() {
                       aria-pressed={config.fsrLiteEnabled}
                       disabled={fsrBusy}
                       onClick={() => void toggleFsrLite()}
-                      title="게임 종료 후 변경: OptiScaler 0.9.4 + FSR 4.1.2 INT8 Lite 설치/해제 (Reflex OFF)"
+                      title="게임 종료 후 변경: OptiScaler 0.9.5 + FSR 4.1.2 INT8 Lite 설치/해제 (Reflex OFF)"
                     >
                       {fsrBusy
                         ? "FSR 적용 중…"

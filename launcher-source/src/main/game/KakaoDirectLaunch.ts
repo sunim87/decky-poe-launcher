@@ -51,11 +51,22 @@ let lastLaunchAt = 0;
 let launchPending = false;
 export const isKakaoGameLaunchPending = () => launchPending;
 
+const finishAutomation = (context: AppContext): void => {
+  context.disableValidationMode();
+  const automationWindow = context.getActiveAutomationWindow?.();
+  if (automationWindow && !automationWindow.isDestroyed()) {
+    context.hideAutomationWindow?.(automationWindow, "direct-launch-success");
+  }
+};
+
 export const launchKakaoGameDirect = async (
   context: AppContext,
   url: string,
 ): Promise<boolean> => {
-  if (launchPending) return true;
+  if (launchPending) {
+    finishAutomation(context);
+    return true;
+  }
   if (isFsrLiteChangePending()) {
     logger.warn("[KakaoDirectLaunch] Blocked while FSR files are changing.");
     return false;
@@ -77,6 +88,7 @@ const launchKakaoGameDirectImpl = async (
     logger.log(
       `[KakaoDirectLaunch] Ignoring duplicate starter protocol (${((now - lastLaunchAt) / 1000).toFixed(1)}s since last launch).`,
     );
+    finishAutomation(context);
     return true;
   }
 
@@ -198,15 +210,7 @@ const launchKakaoGameDirectImpl = async (
   // 직접 실행이 자동화의 종착점이므로 감시 타이머를 꺼서
   // "자동화 진행 중 지연이 발생했습니다" 경고가 뜨지 않게 하고,
   // 게임 위로 자동화 창이 올라오지 않도록 숨긴다.
-  context.disableValidationMode();
-  const automationWindow = context.getActiveAutomationWindow?.();
-  if (
-    automationWindow &&
-    !automationWindow.isDestroyed() &&
-    context.hideAutomationWindow
-  ) {
-    context.hideAutomationWindow(automationWindow, "direct-launch-success");
-  }
+  finishAutomation(context);
 
   const startedAt = Date.now();
   child.on("error", (error) => {

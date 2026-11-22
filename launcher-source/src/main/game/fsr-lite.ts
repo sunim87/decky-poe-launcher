@@ -49,13 +49,13 @@ export function fsrLiteSettings(source: string) {
     Upscalers: { Dx12Upscaler: "fsr31" },
     FrameGen: { Enabled: "false" },
     FSR: {
-      Fsr4Update: "false",
-      Fsr4ForceEnableInt8: "false",
+      Fsr4Update: "true",
+      Fsr4ForceEnableInt8: "3",
       UpscalerIndex: "0",
-      Fsr4EnableWatermark: "auto",
+      Fsr4EnableWatermark: "false",
     },
     Libraries: {
-      FfxDx12Path: `.\\${DIRECTORY}\\amd_fidelityfx_loader_dx12.dll`,
+      FfxDx12Path: `.\\${DIRECTORY}\\amd_fidelityfx_dx12.dll`,
       FfxDx12SRPath: `.\\${DIRECTORY}\\amd_fidelityfx_upscaler_dx12.dll`,
       FfxDx12FGPath: `.\\${DIRECTORY}\\amd_fidelityfx_framegeneration_dx12.dll`,
       XeSSPath: `.\\${DIRECTORY}\\libxess.dll`,

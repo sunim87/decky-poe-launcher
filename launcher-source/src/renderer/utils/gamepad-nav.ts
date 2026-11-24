@@ -314,13 +314,31 @@ export const initGamepadNav = (): void => {
   ensureFocusStyle();
   const readNative = window.electronAPI?.getNativeGamepad;
   if (readNative) {
+    let refreshTimer: number | undefined;
+    let reading = false;
     const refresh = async () => {
-      nativePad = await readNative().catch(() => null);
+      refreshTimer = undefined;
+      if (document.hidden || reading) return;
+      reading = true;
+      const state = await readNative().catch(() => null);
+      reading = false;
+      if (document.hidden) return;
+      nativePad = state;
       if (nativePad && rafId === null)
         rafId = requestAnimationFrame(pollGamepads);
       if (!nativePad) prevPressed.delete(-1);
-      window.setTimeout(refresh, document.hasFocus() ? 25 : 250);
+      refreshTimer = window.setTimeout(refresh, document.hasFocus() ? 25 : 250);
     };
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        void refresh();
+        return;
+      }
+      window.clearTimeout(refreshTimer);
+      refreshTimer = undefined;
+      nativePad = null;
+      prevPressed.delete(-1);
+    });
     void refresh();
   }
 

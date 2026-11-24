@@ -243,6 +243,12 @@ function App() {
 
   // [SteamDeck] 덱 전용 UI(lsfg 토글 등) 노출 여부
   const [isSteamDeck, setIsSteamDeck] = useState(false);
+  const [launcherVisible, setLauncherVisible] = useState(() => !document.hidden);
+  useEffect(() => {
+    const syncVisibility = () => setLauncherVisible(!document.hidden);
+    document.addEventListener("visibilitychange", syncVisibility);
+    return () => document.removeEventListener("visibilitychange", syncVisibility);
+  }, []);
   useEffect(() => {
     window.electronAPI
       ?.isSteamDeck?.()
@@ -2149,7 +2155,7 @@ function App() {
           }}
         >
           {/* Gothic Top Frame Decorations (Now Inside Main Content) */}
-          <div
+          {launcherVisible && <div
             className={`frame-decoration top-center ${
               isTopCenterTitlebarHovered ? "titlebar-hover" : ""
             }`}
@@ -2158,7 +2164,7 @@ function App() {
             <div className="top-center-blue" />
             {/* Interactive Hit Zone for Blue Fire (Top Central Demon) */}
             <div className="top-center-trigger" />
-          </div>
+          </div>}
           <div className="frame-decoration top-left"></div>
           <div className="frame-decoration top-right"></div>
 

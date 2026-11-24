@@ -2,9 +2,9 @@
 import array
 import fcntl
 import json
-import os
 from pathlib import Path
 import select
+import signal
 import struct
 import sys
 import time
@@ -15,7 +15,13 @@ BUTTONS = {304: 0, 305: 1, 310: 4, 311: 5, 544: 12, 545: 13, 546: 14, 547: 15}
 
 def run(output):
     temporary = output.with_suffix(".tmp")
+    paused = output.with_suffix(".json.paused")
     while True:
+        if paused.exists():
+            output.unlink(missing_ok=True)
+            while paused.exists():
+                time.sleep(0.5)
+            continue
         for device in sorted(Path("/dev/input").glob("js*")):
             try:
                 with device.open("rb", buffering=0) as joystick:
@@ -27,7 +33,13 @@ def run(output):
                         continue
                     state = [False] * 16
                     sticks = [0.0, 0.0]
+                    next_pause_check = 0.0
                     while True:
+                        now = time.monotonic()
+                        if now >= next_pause_check:
+                            if paused.exists():
+                                break
+                            next_pause_check = now + 0.25
                         readable, _, _ = select.select([joystick], [], [], 0.25)
                         if readable:
                             data = joystick.read(EVENT.size)
@@ -53,4 +65,13 @@ def run(output):
 
 
 if __name__ == "__main__":
-    run(Path(sys.argv[1]))
+    output = Path(sys.argv[1])
+
+    def stop(_signal, _frame):
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, stop)
+    try:
+        run(output)
+    finally:
+        output.with_suffix(".json.paused").unlink(missing_ok=True)

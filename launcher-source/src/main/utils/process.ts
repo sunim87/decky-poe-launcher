@@ -104,10 +104,20 @@ export interface ProcessInfo {
 
 export const getProcessesInfo = async (
   processNames: string[],
+  knownProcesses: ProcessInfo[] = [],
 ): Promise<ProcessInfo[]> => {
   if (processNames.length === 0) return [];
 
   if (isWineEnvironment()) {
+    if (knownProcesses.length) {
+      const running = await getProcessesInfoViaProcScan(
+        processNames,
+        knownProcesses.map(({ pid }) => String(pid)),
+      );
+      if (knownProcesses.every((known) => running.some(
+        (current) => current.pid === known.pid && current.path === known.path,
+      ))) return running;
+    }
     return getProcessesInfoViaProcScan(processNames);
   }
 
@@ -173,22 +183,37 @@ export const isProcessRunning = async (
  * 주의: 여기서 얻는 pid는 "리눅스" pid라서 taskkill /PID 등 Windows pid를
  * 기대하는 API에는 쓸 수 없다 (이름 기반 taskkill /IM은 사용 가능).
  */
+// Reopening every Linux process through Wine is expensive. Cache only
+// non-matches from the full watcher scan, and periodically recheck them.
+let excludedWinePids = new Set<string>();
+let excludedWineTargets = "";
+let excludedWinePidsExpireAt = 0;
+
 const getProcessesInfoViaProcScan = async (
   processNames: string[],
+  knownPids?: string[],
 ): Promise<ProcessInfo[]> => {
   const targets = processNames.map((n) => n.toLowerCase());
   const processes: ProcessInfo[] = [];
 
   let entries: string[];
   try {
-    entries = await fsp.readdir("Z:\\proc");
+    entries = knownPids ?? await fsp.readdir("Z:\\proc");
   } catch (e) {
     logger.warn("[getProcessesInfoViaProcScan] Unable to read Z:\\proc:", e);
     return [];
   }
 
+  const targetKey = targets.join("\0");
+  const cacheScan = !knownPids && targets.length > 1;
+  if (cacheScan && (targetKey !== excludedWineTargets || Date.now() >= excludedWinePidsExpireAt)) {
+    excludedWinePids = new Set();
+    excludedWineTargets = targetKey;
+    excludedWinePidsExpireAt = Date.now() + 12000;
+  }
   for (const entry of entries) {
     if (!/^\d+$/.test(entry)) continue;
+    if (cacheScan && excludedWinePids.has(entry)) continue;
 
     let cmdline: string;
     try {
@@ -203,13 +228,14 @@ const getProcessesInfoViaProcScan = async (
     const args = cmdline.split("\0").filter(Boolean);
     const loader = args[0]?.split(/[\\/]/).pop()?.toLowerCase() ?? "";
     const isWineLoader = /^(?:wine(?:64)?|wine(?:64)?-preloader)$/.test(loader);
-    for (const arg of args.slice(0, isWineLoader ? 2 : 1)) {
-      const basename = arg.split(/[\\/]/).pop()?.toLowerCase() ?? "";
-      const matched = targets.find((t) => basename === t);
-      if (matched) {
-        processes.push({ pid: Number(entry), name: matched, path: arg });
-        break;
-      }
+    const match = args.slice(0, isWineLoader ? 2 : 1).find((arg) =>
+      targets.includes(arg.split(/[\\/]/).pop()?.toLowerCase() ?? ""),
+    );
+    if (match) {
+      const name = match.split(/[\\/]/).pop()!.toLowerCase();
+      processes.push({ pid: Number(entry), name, path: match });
+    } else if (cacheScan && loader && !isWineLoader) {
+      excludedWinePids.add(entry);
     }
   }
 

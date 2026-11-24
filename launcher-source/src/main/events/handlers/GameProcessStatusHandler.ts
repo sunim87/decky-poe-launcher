@@ -1,3 +1,4 @@
+import { rmSync, writeFileSync } from "node:fs";
 import { AppConfig } from "../../../shared/types";
 import { updateGameStatusCache } from "../../state/GameStatusStore";
 import { processMatchesGameContext } from "../../utils/game-process-context";
@@ -27,12 +28,43 @@ interface ProcessStrategy {
 
 // --- Helper: Status Emitters ---
 
+const activeGames = new Set<string>();
+let hiddenForGame = false;
+
 const emitGameStatus = (
   context: AppContext,
   gameId: AppConfig["activeGame"],
   serviceId: AppConfig["serviceChannel"],
   status: "running" | "idle" | "stopping",
 ) => {
+  if (isWineEnvironment()) {
+    const key = `${gameId}/${serviceId}`;
+    const wasRunning = activeGames.size > 0;
+    if (status === "running") activeGames.add(key);
+    if (status === "idle") activeGames.delete(key);
+    const running = activeGames.size > 0;
+    if (running !== wasRunning) {
+      const state = process.env.POE_GAMEPAD_STATE;
+      if (state?.startsWith("/")) {
+        const pauseFile = `Z:${state.replace(/\//g, "\\")}.paused`;
+        try {
+          if (running) writeFileSync(pauseFile, "");
+          else rmSync(pauseFile, { force: true });
+        } catch (error) {
+          logger.warn(`[GameProcess] Could not update gamepad pause state: ${error}`);
+        }
+      }
+      const window = context.mainWindow;
+      if (window && !window.isDestroyed()) {
+        if (running) {
+          hiddenForGame = window.isVisible() && !window.isMinimized();
+          if (hiddenForGame) window.hide();
+        } else if (hiddenForGame && !window.isVisible()) {
+          window.show();
+        }
+      }
+    }
+  }
   const payload = updateGameStatusCache({ gameId, serviceId, status });
   eventBus.emit<GameStatusChangeEvent>(
     EventType.GAME_STATUS_CHANGE,

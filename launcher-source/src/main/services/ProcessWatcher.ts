@@ -19,6 +19,7 @@ import { processMatchesGameContext } from "../utils/game-process-context";
 import { Logger } from "../utils/logger";
 import { PowerShellManager } from "../utils/powershell";
 import * as processUtils from "../utils/process";
+import { isWineEnvironment } from "../utils/wine";
 
 import type { AppConfig } from "../../shared/types";
 
@@ -53,6 +54,7 @@ export class ProcessWatcher implements IService {
   private launchIntentHandlerId: string | null = null;
   private suspendTimer: NodeJS.Timeout | null = null;
   private isChecking = false;
+  private nextFullScanAt = 0;
   private titleWatchTimer: NodeJS.Timeout | null = null;
 
   constructor(private context: AppContext) {}
@@ -85,7 +87,7 @@ export class ProcessWatcher implements IService {
     }
 
     this.timer = setInterval(() => {
-      void this.checkNow();
+      void this.runCheck(true);
     }, intervalMs);
   }
 
@@ -240,14 +242,23 @@ export class ProcessWatcher implements IService {
     }
   }
 
-  private async runCheck() {
+  private async runCheck(periodic = false) {
     if (this.isChecking) return;
     this.isChecking = true;
 
     try {
       // 1. Fetch current target processes in a single call
-      const currentProcesses =
-        await processUtils.getProcessesInfo(TARGET_PROCESSES);
+      // Wine process IDs are Linux PIDs. During ordinary gameplay, poll
+      // only known clients between full scans. Explicit refreshes scan all.
+      const knownClients = periodic && isWineEnvironment() &&
+        Date.now() < this.nextFullScanAt &&
+        [...this.activePids.values()].every(({ name }) => /^pathofexile/i.test(name))
+        ? [...this.activePids].map(([pid, info]) => ({ pid, ...info }))
+        : [];
+      const currentProcesses = knownClients.length
+        ? await processUtils.getProcessesInfo(TARGET_PROCESSES, knownClients)
+        : await processUtils.getProcessesInfo(TARGET_PROCESSES);
+      if (!knownClients.length) this.nextFullScanAt = Date.now() + 30000;
       const currentPidSet = new Set(currentProcesses.map((p) => p.pid));
 
       // 2. Identify NEW processes (PID not in cache)
@@ -281,7 +292,7 @@ export class ProcessWatcher implements IService {
       }
 
       // 3. Update Title Monitoring state
-      if (this.activePids.size > 0) {
+      if (this.activePids.size > 0 && !isWineEnvironment()) {
         this.ensureTitleMonitoring(true);
       } else {
         this.ensureTitleMonitoring(false);

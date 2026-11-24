@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "build": 15,
-  "version": "1.4.2-sd.33",
-  "url": "https://github.com/sunim87/decky-poe-launcher/releases/download/v0.1.1/POE-Launcher-runtime-v0.1.1.zip",
-  "sha256": "f013525d8a5faabbf4125e15b45bbacea2a9c917ad96bc697b2681f30533b80c",
-  "size": 350445523
+  "build": 16,
+  "version": "1.4.2-sd.34",
+  "url": "https://github.com/sunim87/decky-poe-launcher/releases/download/v0.1.2/POE-Launcher-runtime-v0.1.2.zip",
+  "sha256": "1d407a53b9084c1fdf51279113f5a98f4d16810b7cfbd16e7969f3b53be65ab5",
+  "size": 350597908
 }
